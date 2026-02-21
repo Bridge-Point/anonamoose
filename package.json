@@ -1,0 +1,34 @@
+{
+  "name": "anonamoose",
+  "version": "1.0.0",
+  "description": "LLM Anonymization Proxy - Guaranteed PII Redaction with Rehydration",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "compromise": "^14.14.5",
+    "cors": "^2.8.6",
+    "express": "^4.18.2",
+    "ioredis": "^5.9.3",
+    "uuid": "^9.0.1",
+    "yaml": "^2.3.4",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.6",
+    "@types/uuid": "^9.0.7",
+    "n8n-core": "^1.122.15",
+    "n8n-workflow": "^2.9.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.3"
+  }
+}

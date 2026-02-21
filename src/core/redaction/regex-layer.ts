@@ -1,0 +1,324 @@
+import type { PIIDetection } from '../types.js';
+
+export interface RegexPattern {
+  id: string;
+  name: string;
+  pattern: RegExp;
+  validator?: (match: string) => boolean;
+  confidence: number;
+  country?: string[];
+}
+
+const luhnCheck = (card: string): boolean => {
+  const digits = card.replace(/\D/g, '');
+  if (digits.length < 13 || digits.length > 19) return false;
+  
+  let sum = 0;
+  let isEven = false;
+  
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let digit = parseInt(digits[i], 10);
+    
+    if (isEven) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    
+    sum += digit;
+    isEven = !isEven;
+  }
+  
+  return sum % 10 === 0;
+};
+
+const auMedicareCheck = (num: string): boolean => {
+  const digits = num.replace(/\D/g, '');
+  if (digits.length !== 10) return false;
+  
+  // Medicare check digit algorithm
+  const positionWeights = [1, 3, 7, 9, 1, 3, 7, 9, 1, 3];
+  let sum = 0;
+  
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(digits[i], 10) * positionWeights[i];
+  }
+  
+  return sum % 10 === 0;
+};
+
+const auTfnCheck = (num: string): boolean => {
+  const digits = num.replace(/\D/g, '');
+  if (digits.length !== 9) return false;
+  
+  // TFN uses modulus 11 algorithm
+  const weights = [1, 2, 3, 4, 5, 6, 7, 8, 10];
+  let sum = 0;
+  
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(digits[i], 10) * weights[i];
+  }
+  
+  const remainder = sum % 11;
+  return remainder === 0;
+};
+
+const nzIrdCheck = (num: string): boolean => {
+  const digits = num.replace(/\D/g, '');
+  if (digits.length !== 8 && digits.length !== 9) return false;
+  
+  const weights = [3, 2, 7, 6, 5, 4, 3, 2];
+  let sum = 0;
+  
+  const paddedDigits = digits.padStart(9, '0');
+  for (let i = 0; i < 8; i++) {
+    sum += parseInt(paddedDigits[i], 10) * weights[i];
+  }
+  
+  const remainder = sum % 11;
+  const expectedCheck = remainder === 0 ? 0 : 11 - remainder;
+  
+  return parseInt(paddedDigits[8], 10) === expectedCheck;
+};
+
+export const DEFAULT_PATTERNS: RegexPattern[] = [
+  // Email (universal)
+  {
+    id: 'email',
+    name: 'EMAIL',
+    pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+    confidence: 0.95
+  },
+  
+  // Phone - Australia
+  {
+    id: 'phone-au',
+    name: 'PHONE_AU',
+    pattern: /(?:\+?61|0)[2-478](?:\d{1}[ -]?\d{3}[ -]?\d{3}|\d{4}[ -]?\d{4})/g,
+    confidence: 0.90,
+    country: ['AU']
+  },
+  // Phone - Australia mobile
+  {
+    id: 'phone-au-mobile',
+    name: 'PHONE_AU_MOBILE',
+    pattern: /(?:\+?61|0)4\d{2}[ -]?\d{3}[ -]?\d{3}/g,
+    confidence: 0.92,
+    country: ['AU']
+  },
+  
+  // Phone - New Zealand
+  {
+    id: 'phone-nz',
+    name: 'PHONE_NZ',
+    pattern: /(?:\+?64|0)[2-479]\d{2,3}[ -]?\d{3}[ -]?\d{3,4}/g,
+    confidence: 0.90,
+    country: ['NZ']
+  },
+  // Phone - New Zealand mobile
+  {
+    id: 'phone-nz-mobile',
+    name: 'PHONE_NZ_MOBILE',
+    pattern: /(?:\+?64|0)2\d{2,3}[ -]?\d{3}[ -]?\d{3,4}/g,
+    confidence: 0.92,
+    country: ['NZ']
+  },
+  
+  // Phone - UK
+  {
+    id: 'phone-uk',
+    name: 'PHONE_UK',
+    pattern: /(?:\+?44|0)\d{4}[ -]?\d{6}|\+?44\d{3}[ -]?\d{3}[ -]?\d{3}/g,
+    confidence: 0.88,
+    country: ['UK']
+  },
+  // Phone - UK mobile
+  {
+    id: 'phone-uk-mobile',
+    name: 'PHONE_UK_MOBILE',
+    pattern: /(?:\+?44|0)7\d{3}[ -]?\d{3}[ -]?\d{3}/g,
+    confidence: 0.92,
+    country: ['UK']
+  },
+  // Phone - US (fallback)
+  {
+    id: 'phone-us',
+    name: 'PHONE_US',
+    pattern: /(?:\+?1[-.]?)?\(?[2-9]\d{2}\)?[-.]?\d{3}[-.]?\d{4}/g,
+    confidence: 0.90
+  },
+  
+  // TFN - Australia (Tax File Number)
+  {
+    id: 'au-tfn',
+    name: 'AU_TFN',
+    pattern: /\b\d{3}[ -]?\d{3}[ -]?\d{3}\b/g,
+    validator: auTfnCheck,
+    confidence: 0.95,
+    country: ['AU']
+  },
+  
+  // Medicare - Australia
+  {
+    id: 'au-medicare',
+    name: 'AU_MEDICARE',
+    pattern: /\b\d{2}[ -]?\d{4}[ -]?\d{4}\b/g,
+    validator: auMedicareCheck,
+    confidence: 0.95,
+    country: ['AU']
+  },
+  
+  // ABN - Australia (Australian Business Number)
+  {
+    id: 'au-abn',
+    name: 'AU_ABN',
+    pattern: /\b\d{2}[ -]?\d{3}[ -]?\d{3}[ -]?\d{3}\b/g,
+    confidence: 0.90,
+    country: ['AU']
+  },
+  
+  // IRD - New Zealand (Inland Revenue Department)
+  {
+    id: 'nz-ird',
+    name: 'NZ_IRD',
+    pattern: /\b\d{2,3}[ -]?\d{4,5}[ -]?\d{3}\b/g,
+    confidence: 0.95,
+    country: ['NZ']
+  },
+  
+  // NINO - UK (National Insurance Number)
+  {
+    id: 'uk-nino',
+    name: 'UK_NINO',
+    pattern: /\b[A-CEGHJ-PR-TW-Z]{1}[A-CEGHJ-NPR-TW-Z]{1}[0-9]{6}[A-D]{1}\b/gi,
+    confidence: 0.98,
+    country: ['UK']
+  },
+  
+  // UK Passport Number
+  {
+    id: 'uk-passport',
+    name: 'UK_PASSPORT',
+    pattern: /\b\d{9}\b/g,
+    confidence: 0.75,
+    country: ['UK']
+  },
+  
+  // UK Driving Licence
+  {
+    id: 'uk-driving-licence',
+    name: 'UK_DRIVING_LICENCE',
+    pattern: /\b[A-Z]{5}\d{6}[A-Z]{5}\b|\b\d{5}[ -]?\d{5}[ -]?\d{5}[ -]?\d{2}\b/gi,
+    confidence: 0.85,
+    country: ['UK']
+  },
+  
+  // SSN - US (legacy support)
+  {
+    id: 'ssn-us',
+    name: 'SSN_US',
+    pattern: /\b\d{3}[ -]?\d{2}[ -]?\d{4}\b/g,
+    confidence: 0.90
+  },
+  
+  // Credit Card (all major cards)
+  {
+    id: 'credit-card',
+    name: 'CREDIT_CARD',
+    pattern: /\b(?:\d{4}[ -]?){3}\d{4}\b/g,
+    validator: luhnCheck,
+    confidence: 0.95
+  },
+  
+  // Bank Account - Australia (BSB + Account)
+  {
+    id: 'au-bank-account',
+    name: 'AU_BANK_ACCOUNT',
+    pattern: /\b\d{3}[ -]?\d{3}[ -]\d{1,10}\b/g,
+    confidence: 0.85,
+    country: ['AU']
+  },
+  
+  // UK Sort Code
+  {
+    id: 'uk-sort-code',
+    name: 'UK_SORT_CODE',
+    pattern: /\b\d{2}[ -]?\d{2}[ -]?\d{2}\b/g,
+    confidence: 0.80,
+    country: ['UK']
+  },
+  
+  // IBAN (International Bank Account Number) - UK, EU, AU, NZ
+  {
+    id: 'iban',
+    name: 'IBAN',
+    pattern: /\b[A-Z]{2}\d{2}[A-Z0-9]{4,31}\b/g,
+    confidence: 0.95
+  },
+  
+  // IP Address
+  {
+    id: 'ip-address',
+    name: 'IP_ADDRESS',
+    pattern: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
+    confidence: 0.85
+  },
+  
+  // Date of Birth - Various formats
+  {
+    id: 'dob-au',
+    name: 'DATE_OF_BIRTH_AU',
+    pattern: /\b(?:0?[1-9]|[12]\d|3[01])[/-](?:0?[1-9]|1[012])[/-](?:19|20)\d{2}\b/g,
+    confidence: 0.80,
+    country: ['AU']
+  },
+  {
+    id: 'dob-nz',
+    name: 'DATE_OF_BIRTH_NZ',
+    pattern: /\b(?:0?[1-9]|[12]\d|3[01])[/-](?:0?[1-9]|1[012])[/-](?:19|20)\d{2}\b/g,
+    confidence: 0.80,
+    country: ['NZ']
+  },
+  {
+    id: 'dob-uk',
+    name: 'DATE_OF_BIRTH_UK',
+    pattern: /\b(?:0?[1-9]|[12]\d|3[01])[/-](?:0?[1-9]|1[012])[/-](?:19|20)\d{2}\b/g,
+    confidence: 0.80,
+    country: ['UK']
+  },
+  
+  // UK Postcode
+  {
+    id: 'uk-postcode',
+    name: 'UK_POSTCODE',
+    pattern: /\b[A-Z]{1,2}\d[A-Z\d]?[ -]?\d[A-Z]{2}\b/gi,
+    confidence: 0.90,
+    country: ['UK']
+  },
+  
+  // Australian Postcode
+  {
+    id: 'au-postcode',
+    name: 'AU_POSTCODE',
+    pattern: /\b\d{4}\b/g,
+    confidence: 0.70,
+    country: ['AU']
+  },
+  
+  // NZ Postcode
+  {
+    id: 'nz-postcode',
+    name: 'NZ_POSTCODE',
+    pattern: /\b\d{4}\b/g,
+    confidence: 0.70,
+    country: ['NZ']
+  },
+  
+  // Australian Address Patterns (common formats)
+  {
+    id: 'au-address',
+    name: 'AU_ADDRESS',
+    pattern: /\b\d+\s+[A-Za-z\s]+(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Circuit|Cct)\b/gi,
+    confidence: 0.75,
+    country: ['AU']
+  }
+];
