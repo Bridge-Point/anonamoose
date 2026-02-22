@@ -1,0 +1,35 @@
+---
+title: Anonamoose
+description: LLM Anonymization Proxy — Guaranteed PII Redaction with Rehydration
+template: splash
+hero:
+  tagline: Guarantee PII redaction where probabilistic detection fails. Dictionary rules, regex patterns, and NER — with full rehydration.
+  actions:
+    - text: Get Started
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/mooseagency/anonamoose
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why Anonamoose?
+
+<CardGrid stagger>
+  <Card title="Guaranteed Redaction" icon="approve-check">
+    Dictionary-based rules are **never bypassed** by probabilistic detection. If you add a term, it will always be redacted — 100% recall.
+  </Card>
+  <Card title="Three-Layer Pipeline" icon="list-format">
+    Dictionary → Regex → NER. Each layer catches what the previous might miss, from explicit terms to algorithmic patterns to context-aware detection.
+  </Card>
+  <Card title="Full Rehydration" icon="random">
+    Tokenized placeholders using Unicode Private Use Area characters allow deterministic restoration of original values after LLM processing.
+  </Card>
+  <Card title="Drop-in Proxy" icon="rocket">
+    Point your OpenAI or Anthropic SDK at Anonamoose and PII is automatically redacted on the way in and rehydrated on the way out. Full streaming support.
+  </Card>
+</CardGrid>
