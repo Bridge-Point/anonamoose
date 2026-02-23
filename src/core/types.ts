@@ -57,7 +57,7 @@ export interface ProxyConfig {
 export const DEFAULT_REDACTION_CONFIG: RedactionConfig = {
   enableDictionary: true,
   enableRegex: true,
-  enableNER: false, // Disabled by default for performance
+  enableNER: true, // Transformer model loads lazily on first NER call
   tokenizePlaceholders: true,
   placeholderPrefix: '\uE000',
   placeholderSuffix: '\uE001'

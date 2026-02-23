@@ -15,7 +15,7 @@ Get Anonamoose running locally and make your first redacted request.
 ## Install
 
 ```bash
-git clone https://github.com/mooseagency/anonamoose.git
+git clone https://github.com/Bridge-Point/anonamoose.git
 cd anonamoose
 npm install
 ```

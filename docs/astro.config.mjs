@@ -8,10 +8,10 @@ export default defineConfig({
       title: 'Anonamoose',
       description: 'LLM Anonymization Proxy — Guaranteed PII Redaction with Rehydration',
       social: {
-        github: 'https://github.com/mooseagency/anonamoose',
+        github: 'https://github.com/Bridge-Point/anonamoose',
       },
       editLink: {
-        baseUrl: 'https://github.com/mooseagency/anonamoose/edit/main/docs/',
+        baseUrl: 'https://github.com/Bridge-Point/anonamoose/edit/main/docs/',
       },
       lastUpdated: true,
       customCss: ['./src/styles/custom.css'],

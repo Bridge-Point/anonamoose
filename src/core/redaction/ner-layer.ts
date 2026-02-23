@@ -1,5 +1,11 @@
-import nlp from 'compromise';
+import { pipeline, env, type TokenClassificationPipeline } from '@huggingface/transformers';
 import type { PIIDetection } from '../types.js';
+
+// Must be set before any pipeline calls
+env.allowRemoteModels = true;
+if (process.env.NER_MODEL_CACHE) {
+  env.cacheDir = process.env.NER_MODEL_CACHE;
+}
 
 export interface NERConfig {
   minConfidence: number;
@@ -12,12 +18,33 @@ export interface NERRedactResult {
   detections: PIIDetection[];
 }
 
+interface RawEntity {
+  entity: string;
+  score: number;
+  index: number;
+  word: string;
+}
+
+interface MergedEntity {
+  category: string;
+  word: string;
+  score: number;
+}
+
+const BIO_CATEGORY_MAP: Record<string, string> = {
+  'PER': 'PERSON',
+  'ORG': 'ORG',
+  'LOC': 'LOCATION',
+  'MISC': 'MISC',
+};
+
 const DEFAULT_NER_CONFIG: NERConfig = {
-  minConfidence: 0.5,
-  entityTypes: ['Person', 'Organization', 'Place']
+  minConfidence: 0.6,
+  entityTypes: ['PERSON', 'ORG', 'LOCATION', 'MISC'],
 };
 
 export class NERLayer {
+  private static pipelineInstance: TokenClassificationPipeline | null = null;
   private config: NERConfig;
   private tokenizer: (text: string) => string;
   private counter = 0;
@@ -30,72 +57,133 @@ export class NERLayer {
     });
   }
 
+  private static async getPipeline(): Promise<TokenClassificationPipeline> {
+    if (!this.pipelineInstance) {
+      this.pipelineInstance = await pipeline(
+        'token-classification',
+        'Xenova/bert-base-NER',
+        { dtype: 'q8' }
+      ) as TokenClassificationPipeline;
+    }
+    return this.pipelineInstance;
+  }
+
   async redact(text: string): Promise<NERRedactResult> {
     const tokens = new Map<string, string>();
     const detections: PIIDetection[] = [];
-    
-    const doc = nlp(text);
-    
-    const people = doc.people().out('array') as string[];
-    const orgs = doc.organizations().out('array') as string[];
-    const places = doc.places().out('array') as string[];
-    
-    const entities = [...new Set([...people, ...orgs, ...places])];
-    
+
+    const ner = await NERLayer.getPipeline();
+    const rawEntities = await ner(text, { ignore_labels: [] }) as RawEntity[];
+
+    // Filter to B-/I- tags only (skip 'O' labels)
+    const bioEntities = rawEntities.filter(
+      (e) => e.entity.startsWith('B-') || e.entity.startsWith('I-')
+    );
+
+    // Merge subword tokens into full entity spans
+    const merged = this.mergeEntities(bioEntities);
+
+    // Deduplicate entity words
+    const uniqueEntities = [...new Map(merged.map(e => [e.word, e])).values()];
+
+    // Filter by confidence and allowed entity types
+    const filtered = uniqueEntities.filter(
+      (e) =>
+        e.score >= this.config.minConfidence &&
+        this.config.entityTypes.includes(e.category)
+    );
+
     let result = text;
 
-    for (const entity of entities) {
-      if (!entity || entity.length < 2) continue;
-      
-      const regex = new RegExp(this.escapePattern(entity), 'gi');
+    // Find each entity in the text and replace it
+    for (const entity of filtered) {
+      if (!entity.word || entity.word.length < 2) continue;
+
+      const escaped = entity.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'gi');
       let match;
-      
+
       while ((match = regex.exec(text)) !== null) {
         const token = this.tokenizer(`NER_${match[0]}`);
-        
+
         if (!tokens.has(token)) {
           tokens.set(token, match[0]);
-          
+
           detections.push({
             type: 'ner',
-            category: this.categorizeEntity(entity),
+            category: entity.category,
             value: match[0],
             startIndex: match.index,
             endIndex: match.index + match[0].length,
-            confidence: this.config.minConfidence + 0.2
+            confidence: entity.score,
           });
         }
       }
     }
 
+    // Replace entities in text (process right-to-left to preserve indices)
     const sortedDetections = detections.sort((a, b) => b.startIndex - a.startIndex);
-    
+
     for (const detection of sortedDetections) {
       const token = [...tokens.entries()].find(([, v]) => v === detection.value)?.[0];
       if (token) {
-        const escaped = this.escapePattern(detection.value);
-        const regex = new RegExp(escaped, 'gi');
-        result = result.replace(regex, token);
+        result =
+          result.slice(0, detection.startIndex) +
+          token +
+          result.slice(detection.endIndex);
       }
     }
 
     return { text: result, tokens, detections };
   }
 
-  private categorizeEntity(entity: string): string {
-    const doc = nlp(entity);
-    
-    if (doc.people().found) return 'PERSON';
-    if (doc.organizations().found) return 'ORG';
-    if (doc.places().found) return 'LOCATION';
-    return 'ENTITY';
-  }
+  private mergeEntities(entities: RawEntity[]): MergedEntity[] {
+    const merged: MergedEntity[] = [];
 
-  private escapePattern(pattern: string): string {
-    return pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    for (const entity of entities) {
+      const tag = entity.entity.slice(0, 2); // 'B-' or 'I-'
+      const label = entity.entity.slice(2);  // 'PER', 'ORG', 'LOC', 'MISC'
+      const category = BIO_CATEGORY_MAP[label] || label;
+
+      if (tag === 'B-') {
+        // Start a new entity
+        merged.push({
+          category,
+          word: entity.word,
+          score: entity.score,
+        });
+      } else if (tag === 'I-' && merged.length > 0) {
+        const last = merged[merged.length - 1];
+        // Continue the current entity if same category
+        if (last.category === category) {
+          // Handle WordPiece subword tokens (## prefix)
+          if (entity.word.startsWith('##')) {
+            last.word += entity.word.slice(2);
+          } else {
+            last.word += ' ' + entity.word;
+          }
+          // Average the confidence scores
+          last.score = (last.score + entity.score) / 2;
+        } else {
+          // Different category I- tag without matching B- — treat as new entity
+          merged.push({
+            category,
+            word: entity.word,
+            score: entity.score,
+          });
+        }
+      }
+    }
+
+    return merged;
   }
 
   reset(): void {
     this.counter = 0;
+  }
+
+  /** Reset the singleton pipeline (for testing) */
+  static resetPipeline(): void {
+    this.pipelineInstance = null;
   }
 }

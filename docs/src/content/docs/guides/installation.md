@@ -13,7 +13,7 @@ description: Install Anonamoose from source or with Docker.
 ### Steps
 
 ```bash
-git clone https://github.com/mooseagency/anonamoose.git
+git clone https://github.com/Bridge-Point/anonamoose.git
 cd anonamoose
 npm install
 npm run build

@@ -24,7 +24,7 @@ Anonamoose's dictionary layer solves this: **if you add a term, it will always b
 | **AU/NZ/UK patterns** | Limited coverage | Comprehensive with validators (TFN, Medicare, IRD, NINO) |
 | **Stats dashboard** | No | Built-in (Next.js + shadcn) |
 | **Language** | Python | TypeScript/Node.js |
-| **NER engine** | spaCy (heavy) | compromise.js (lightweight) |
+| **NER engine** | spaCy `en_core_web_lg` | Transformer (`bert-base-NER`, F1: 91.3) |
 
 ## When to use Anonamoose
 
@@ -34,6 +34,10 @@ Anonamoose's dictionary layer solves this: **if you add a term, it will always b
 - You need **rehydration** — restoring original values after LLM processing
 - You're working with **AU/NZ/UK** PII formats
 - You want **streaming** support for chat completions
+
+## NER comparison
+
+Anonamoose now uses a transformer-based NER model (`Xenova/bert-base-NER`, quantized ONNX) running natively in Node.js via `@huggingface/transformers`. This achieves an F1 score of 91.3 on CoNLL-2003, which is comparable to Presidio's default spaCy `en_core_web_lg` model — without requiring any Python dependency. The model loads lazily on first NER request and provides real confidence scores for each detected entity.
 
 ## When to use Presidio
 
