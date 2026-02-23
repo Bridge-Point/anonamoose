@@ -47,7 +47,6 @@ export class DictionaryService {
     }
 
     let result = text;
-    let offset = 0;
     const sortedEntries = Array.from(this.entries.values()).sort((a, b) => b.term.length - a.term.length);
 
     for (const entry of sortedEntries) {
@@ -58,23 +57,22 @@ export class DictionaryService {
       const flags = entry.caseSensitive ? 'g' : 'gi';
       const regex = new RegExp(pattern, flags);
       
-      result = result.replace(regex, (match) => {
+      result = result.replace(regex, (match, offset) => {
         const token = this.tokenizer(`TOKEN_${match}_${Math.random().toString(36).substr(2, 9)}`);
-        
+
         if (!tokens.has(token)) {
           tokens.set(token, match);
-          
-          const matchIndex = text.indexOf(match);
+
           detections.push({
             type: 'dictionary',
             category: 'CUSTOM_DICTIONARY',
             value: match,
-            startIndex: matchIndex,
-            endIndex: matchIndex + match.length,
+            startIndex: offset,
+            endIndex: offset + match.length,
             confidence: 1.0
           });
         }
-        
+
         return token;
       });
     }

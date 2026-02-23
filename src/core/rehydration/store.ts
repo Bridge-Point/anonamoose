@@ -18,6 +18,7 @@ export interface SessionData {
 
 const MAX_LOCAL_SESSIONS = 10000;
 const CLEANUP_INTERVAL_MS = 60 * 1000;
+const SESSION_ID_REGEX = /^[a-f0-9\-]{36}$/i;
 
 export class RehydrationStore {
   private redis?: Redis;
@@ -80,6 +81,10 @@ export class RehydrationStore {
     return keys;
   }
 
+  private static isValidSessionId(id: string): boolean {
+    return SESSION_ID_REGEX.test(id);
+  }
+
   async store(
     sessionId: string,
     tokens: Map<string, string>,
@@ -88,6 +93,9 @@ export class RehydrationStore {
     category: string = 'PII',
     meta?: Record<string, string>
   ): Promise<void> {
+    if (!RehydrationStore.isValidSessionId(sessionId)) {
+      throw new Error('Invalid session ID format');
+    }
     const now = new Date().toISOString();
 
     // Deduplicate tokens - if same original value exists, don't add again
@@ -131,6 +139,9 @@ export class RehydrationStore {
   }
 
   async retrieve(sessionId: string): Promise<SessionData | null> {
+    if (!RehydrationStore.isValidSessionId(sessionId)) {
+      return null;
+    }
     if (this.redis) {
       const key = `anonamoose:session:${sessionId}`;
       const data = await this.redis.get(key);
@@ -168,6 +179,9 @@ export class RehydrationStore {
   }
 
   async delete(sessionId: string): Promise<boolean> {
+    if (!RehydrationStore.isValidSessionId(sessionId)) {
+      return false;
+    }
     if (this.redis) {
       const result = await this.redis.del(`anonamoose:session:${sessionId}`);
       return result > 0;
@@ -191,6 +205,9 @@ export class RehydrationStore {
   }
 
   async extend(sessionId: string, ttlSeconds: number): Promise<boolean> {
+    if (!RehydrationStore.isValidSessionId(sessionId)) {
+      return false;
+    }
     if (this.redis) {
       const key = `anonamoose:session:${sessionId}`;
       const result = await this.redis.expire(key, ttlSeconds);

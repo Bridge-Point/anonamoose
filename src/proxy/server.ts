@@ -163,6 +163,21 @@ export class ProxyServer {
         return;
       }
 
+      for (const e of entries) {
+        if (!e || typeof e !== 'object') {
+          res.status(400).json({ error: 'each entry must be an object' });
+          return;
+        }
+        if (typeof e.term !== 'string' || e.term.trim().length === 0) {
+          res.status(400).json({ error: 'each entry must have a non-empty "term" string' });
+          return;
+        }
+        if (e.term.length > 1000) {
+          res.status(400).json({ error: 'term must be 1000 characters or fewer' });
+          return;
+        }
+      }
+
       const formatted = entries.map((e: any) => ({
         id: e.id || uuidv4(),
         term: e.term,
@@ -193,8 +208,8 @@ export class ProxyServer {
         const { id } = req.params;
         const { text } = req.body;
 
-        if (!text) {
-          res.status(400).json({ error: 'text is required' });
+        if (!text || typeof text !== 'string') {
+          res.status(400).json({ error: 'text must be a non-empty string' });
           return;
         }
 
@@ -344,8 +359,18 @@ export class ProxyServer {
         const { id } = req.params;
         const { tokens, type, category, meta, ttl } = req.body;
 
-        if (!tokens || typeof tokens !== 'object') {
-          res.status(400).json({ error: 'tokens object is required' });
+        if (!tokens || typeof tokens !== 'object' || Array.isArray(tokens)) {
+          res.status(400).json({ error: 'tokens must be a non-null object' });
+          return;
+        }
+
+        if (type && !['dictionary', 'regex', 'ner'].includes(type)) {
+          res.status(400).json({ error: 'type must be "dictionary", "regex", or "ner"' });
+          return;
+        }
+
+        if (ttl !== undefined && (typeof ttl !== 'number' || ttl < 1 || ttl > 86400)) {
+          res.status(400).json({ error: 'ttl must be a number between 1 and 86400' });
           return;
         }
 

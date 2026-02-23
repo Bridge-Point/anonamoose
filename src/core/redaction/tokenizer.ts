@@ -5,7 +5,7 @@ export class Tokenizer {
   private readonly suffix = '\uE001';
 
   generatePlaceholder(): string {
-    const id = uuidv4().substring(0, 8);
+    const id = uuidv4().replace(/-/g, '').substring(0, 16);
     return `${this.prefix}${id}${this.suffix}`;
   }
 
