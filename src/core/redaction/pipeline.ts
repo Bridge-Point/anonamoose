@@ -114,8 +114,8 @@ export class RedactionPipeline {
       const token = [...tokens.entries()].find(([, v]) => v === detection.value)?.[0];
       if (token) {
         const escaped = detection.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escaped, 'i');
-        result = result.replace(regex, token);
+        const regex = new RegExp(escaped, 'gi');
+        result = result.replaceAll(regex, token);
       }
     }
 

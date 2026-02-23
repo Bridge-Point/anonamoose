@@ -16,10 +16,14 @@ export interface SessionData {
   lastAccessedAt: string;
 }
 
+const MAX_LOCAL_SESSIONS = 10000;
+const CLEANUP_INTERVAL_MS = 60 * 1000;
+
 export class RehydrationStore {
   private redis?: Redis;
   private localSessions: Map<string, SessionData> = new Map();
   private defaultTTL = 3600;
+  private cleanupTimer: ReturnType<typeof setInterval>;
 
   constructor(redisUrl?: string) {
     if (redisUrl) {
@@ -36,25 +40,63 @@ export class RehydrationStore {
         console.warn('Redis connection failed, using in-memory store:', e);
       }
     }
+
+    // Periodically clean expired in-memory sessions
+    this.cleanupTimer = setInterval(() => this.cleanupExpired(), CLEANUP_INTERVAL_MS);
+  }
+
+  private cleanupExpired(): void {
+    if (this.redis) return;
+    const now = new Date();
+    for (const [id, session] of this.localSessions) {
+      if (now > new Date(session.expiresAt)) {
+        this.localSessions.delete(id);
+      }
+    }
+  }
+
+  private evictIfNeeded(): void {
+    if (this.localSessions.size < MAX_LOCAL_SESSIONS) return;
+
+    // Evict oldest sessions first
+    const sorted = [...this.localSessions.entries()]
+      .sort((a, b) => new Date(a[1].createdAt).getTime() - new Date(b[1].createdAt).getTime());
+
+    const toEvict = sorted.slice(0, Math.floor(MAX_LOCAL_SESSIONS * 0.1));
+    for (const [id] of toEvict) {
+      this.localSessions.delete(id);
+    }
+  }
+
+  private async scanKeys(pattern: string): Promise<string[]> {
+    if (!this.redis) return [];
+    const keys: string[] = [];
+    let cursor = '0';
+    do {
+      const [nextCursor, batch] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+      keys.push(...batch);
+    } while (cursor !== '0');
+    return keys;
   }
 
   async store(
-    sessionId: string, 
-    tokens: Map<string, string>, 
+    sessionId: string,
+    tokens: Map<string, string>,
     ttlSeconds: number = this.defaultTTL,
     type: 'dictionary' | 'regex' | 'ner' = 'regex',
     category: string = 'PII',
     meta?: Record<string, string>
   ): Promise<void> {
     const now = new Date().toISOString();
-    
+
     // Deduplicate tokens - if same original value exists, don't add again
     const existingData = await this.retrieve(sessionId);
     const existingTokens = existingData?.tokens || [];
     const existingOriginals = new Set(existingTokens.map(t => t.original.toLowerCase()));
 
     const newTokens: TokenEntry[] = [];
-    
+
     for (const [tokenized, original] of tokens) {
       if (!existingOriginals.has(original.toLowerCase())) {
         newTokens.push({
@@ -83,6 +125,7 @@ export class RehydrationStore {
       const data = JSON.stringify(session);
       await this.redis.setex(key, ttlSeconds, data);
     } else {
+      this.evictIfNeeded();
       this.localSessions.set(sessionId, session);
     }
   }
@@ -91,9 +134,9 @@ export class RehydrationStore {
     if (this.redis) {
       const key = `anonamoose:session:${sessionId}`;
       const data = await this.redis.get(key);
-      
+
       if (!data) return null;
-      
+
       try {
         return JSON.parse(data);
       } catch {
@@ -102,12 +145,12 @@ export class RehydrationStore {
     } else {
       const session = this.localSessions.get(sessionId);
       if (!session) return null;
-      
+
       if (new Date() > new Date(session.expiresAt)) {
         this.localSessions.delete(sessionId);
         return null;
       }
-      
+
       return session;
     }
   }
@@ -115,12 +158,12 @@ export class RehydrationStore {
   async hydrate(text: string, sessionId: string): Promise<string> {
     const session = await this.retrieve(sessionId);
     if (!session) return text;
-    
+
     let result = text;
     for (const token of session.tokens) {
       result = result.replaceAll(token.tokenized, token.original);
     }
-    
+
     return result;
   }
 
@@ -135,7 +178,7 @@ export class RehydrationStore {
 
   async deleteAll(): Promise<number> {
     if (this.redis) {
-      const keys = await this.redis.keys('anonamoose:session:*');
+      const keys = await this.scanKeys('anonamoose:session:*');
       if (keys.length > 0) {
         return await this.redis.del(...keys);
       }
@@ -155,7 +198,7 @@ export class RehydrationStore {
     } else {
       const session = this.localSessions.get(sessionId);
       if (!session) return false;
-      
+
       session.expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
       return true;
     }
@@ -163,7 +206,7 @@ export class RehydrationStore {
 
   async size(): Promise<number> {
     if (this.redis) {
-      const keys = await this.redis.keys('anonamoose:session:*');
+      const keys = await this.scanKeys('anonamoose:session:*');
       return keys.length;
     } else {
       return this.localSessions.size;
@@ -172,9 +215,9 @@ export class RehydrationStore {
 
   async getAllSessions(): Promise<SessionData[]> {
     if (this.redis) {
-      const keys = await this.redis.keys('anonamoose:session:*');
+      const keys = await this.scanKeys('anonamoose:session:*');
       const sessions: SessionData[] = [];
-      
+
       for (const key of keys) {
         const data = await this.redis.get(key);
         if (data) {
@@ -185,8 +228,8 @@ export class RehydrationStore {
           }
         }
       }
-      
-      return sessions.sort((a, b) => 
+
+      return sessions.sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     } else {
@@ -198,9 +241,9 @@ export class RehydrationStore {
   async search(query: string): Promise<SessionData[]> {
     const sessions = await this.getAllSessions();
     const lowerQuery = query.toLowerCase();
-    
-    return sessions.filter(session => 
-      session.tokens.some(t => 
+
+    return sessions.filter(session =>
+      session.tokens.some(t =>
         t.original.toLowerCase().includes(lowerQuery) ||
         t.category.toLowerCase().includes(lowerQuery) ||
         (t.meta && Object.values(t.meta).some(v => v.toLowerCase().includes(lowerQuery)))
@@ -216,9 +259,9 @@ export class RehydrationStore {
   }> {
     const sessions = await this.getAllSessions();
     const totalTokens = sessions.reduce((sum, s) => sum + s.tokens.length, 0);
-    
+
     let memoryUsage: string | undefined;
-    
+
     if (this.redis && this.redis.status === 'ready') {
       try {
         const info = await this.redis.info('memory');
@@ -230,7 +273,7 @@ export class RehydrationStore {
         // Ignore memory info errors
       }
     }
-    
+
     return {
       sessionCount: sessions.length,
       totalTokens,

@@ -2,10 +2,12 @@ node_modules/
 dist/
 .env
 .env.local
+.env*.example
 *.log
 .DS_Store
 
-# Docs build artifacts
+# Build artifacts
+ui/.next/
 docs/node_modules/
 docs/dist/
 docs/.astro/
