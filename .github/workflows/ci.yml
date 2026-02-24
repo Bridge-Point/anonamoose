@@ -38,6 +38,21 @@ jobs:
           name: coverage-report
           path: coverage/
 
+      - name: Generate coverage badge
+        if: matrix.node-version == 22 && github.ref == 'refs/heads/main'
+        uses: jaywcjlove/coverage-badges-cli@main
+        with:
+          source: coverage/coverage-summary.json
+          output: coverage/badge.svg
+
+      - name: Deploy coverage badge to GitHub Pages
+        if: matrix.node-version == 22 && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./coverage
+          destination_dir: coverage
+
   lint:
     runs-on: ubuntu-latest
     steps:

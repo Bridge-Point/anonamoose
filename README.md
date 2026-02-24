@@ -1,6 +1,7 @@
 # Anonamoose
 
 [![CI](https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml/badge.svg)](https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml)
+[![Coverage](https://bridge-point.github.io/anonamoose/coverage/badge.svg)](https://bridge-point.github.io/anonamoose/coverage/)
 
 > **License Notice:** Anonamoose is free for personal projects and non-commercial use. If you or your organisation are using Anonamoose to generate revenue, provide services to customers, or operate as part of a business (including not-for-profits), you need a commercial license. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz) for licensing. See [LICENSE](./LICENSE) for full terms.
 
@@ -89,6 +90,32 @@ App → Anonamoose Proxy → LLM API
 | `API_TOKEN` | — | Bearer token for management API |
 | `STATS_TOKEN` | — | Bearer token for stats endpoint |
 | `NER_MODEL_CACHE` | — | Custom cache directory for the NER model |
+
+## Testing
+
+159 tests across 7 suites — **99.5% statement coverage**.
+
+```bash
+npm test                # run all tests
+npm run test:coverage   # run with coverage report
+```
+
+| Module | Statements | Branches | Functions | Lines |
+|--------|-----------|----------|-----------|-------|
+| `redaction/pipeline.ts` | 100% | 100% | 100% | 100% |
+| `redaction/regex-layer.ts` | 100% | 100% | 100% | 100% |
+| `redaction/dictionary.ts` | 100% | 100% | 100% | 100% |
+| `redaction/tokenizer.ts` | 100% | 100% | 100% | 100% |
+| `redaction/ner-layer.ts` | 96% | 90% | 100% | 96% |
+| `rehydration/store.ts` | 100% | 97% | 100% | 100% |
+
+Test suites cover:
+- **Regex patterns** — AU/NZ/UK/US phone numbers, emails, government IDs (TFN, IRD, NINO, SSN), credit cards (Luhn), bank accounts, postcodes, IP addresses, dates
+- **Dictionary** — exact match, case-insensitive, multi-word, custom category
+- **Tokenizer** — Unicode PUA token generation, uniqueness, replacement
+- **NER** — transformer entity detection (PERSON, ORG, LOCATION), BIO tag merging, WordPiece subwords, confidence filtering, circuit breaker
+- **Pipeline** — full three-layer integration with synthetic PII scenarios
+- **Rehydration store** — in-memory and Redis (mocked) session storage, TTL, cleanup, eviction
 
 ## Documentation
 
