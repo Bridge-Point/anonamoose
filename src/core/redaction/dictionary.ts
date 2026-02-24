@@ -58,7 +58,7 @@ export class DictionaryService {
       const regex = new RegExp(pattern, flags);
       
       result = result.replace(regex, (match, offset) => {
-        const token = this.tokenizer(`TOKEN_${match}_${Math.random().toString(36).substr(2, 9)}`);
+        const token = this.tokenizer(match);
 
         if (!tokens.has(token)) {
           tokens.set(token, match);

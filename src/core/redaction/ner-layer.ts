@@ -45,6 +45,10 @@ const DEFAULT_NER_CONFIG: NERConfig = {
 
 export class NERLayer {
   private static pipelineInstance: TokenClassificationPipeline | null = null;
+  private static loadFailed = false;
+  private static lastLoadAttempt = 0;
+  private static readonly RETRY_INTERVAL_MS = 60_000;
+  private static readonly MAX_INPUT_LENGTH = 10_000;
   private config: NERConfig;
   private tokenizer: (text: string) => string;
   private counter = 0;
@@ -57,22 +61,41 @@ export class NERLayer {
     });
   }
 
-  private static async getPipeline(): Promise<TokenClassificationPipeline> {
-    if (!this.pipelineInstance) {
+  private static async getPipeline(): Promise<TokenClassificationPipeline | null> {
+    if (this.pipelineInstance) return this.pipelineInstance;
+
+    if (this.loadFailed && Date.now() - this.lastLoadAttempt < this.RETRY_INTERVAL_MS) {
+      return null;
+    }
+
+    try {
+      this.lastLoadAttempt = Date.now();
       this.pipelineInstance = await pipeline(
         'token-classification',
         'Xenova/bert-base-NER',
         { dtype: 'q8' }
       ) as TokenClassificationPipeline;
+      this.loadFailed = false;
+      return this.pipelineInstance;
+    } catch (err) {
+      console.error('NER model load failed:', err);
+      this.loadFailed = true;
+      return null;
     }
-    return this.pipelineInstance;
   }
 
   async redact(text: string): Promise<NERRedactResult> {
     const tokens = new Map<string, string>();
     const detections: PIIDetection[] = [];
 
+    if (text.length > NERLayer.MAX_INPUT_LENGTH) {
+      return { text, tokens, detections };
+    }
+
     const ner = await NERLayer.getPipeline();
+    if (!ner) {
+      return { text, tokens, detections };
+    }
     const rawEntities = await ner(text, { ignore_labels: [] }) as RawEntity[];
 
     // Filter to B-/I- tags only (skip 'O' labels)
@@ -185,5 +208,7 @@ export class NERLayer {
   /** Reset the singleton pipeline (for testing) */
   static resetPipeline(): void {
     this.pipelineInstance = null;
+    this.loadFailed = false;
+    this.lastLoadAttempt = 0;
   }
 }

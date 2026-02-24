@@ -51,9 +51,8 @@ export class RedactionPipeline {
     if (this.config.enableNER) {
       const nerResult = await this.nerLayer.redact(result);
       const newDetections = nerResult.detections.filter(
-        d => !detections.some(existing => 
-          existing.startIndex === d.startIndex && 
-          existing.endIndex === d.endIndex
+        d => !detections.some(existing =>
+          existing.value === d.value && existing.category === d.category
         )
       );
       for (const [token, original] of nerResult.tokens) {
@@ -109,13 +108,14 @@ export class RedactionPipeline {
 
     const sortedDetections = detections.sort((a, b) => b.startIndex - a.startIndex);
     let result = text;
-    
+
     for (const detection of sortedDetections) {
       const token = [...tokens.entries()].find(([, v]) => v === detection.value)?.[0];
       if (token) {
-        const escaped = detection.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escaped, 'gi');
-        result = result.replaceAll(regex, token);
+        result =
+          result.slice(0, detection.startIndex) +
+          token +
+          result.slice(detection.endIndex);
       }
     }
 

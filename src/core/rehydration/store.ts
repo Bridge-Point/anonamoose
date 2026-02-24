@@ -311,4 +311,11 @@ export class RehydrationStore {
       redisConnected
     };
   }
+
+  destroy(): void {
+    clearInterval(this.cleanupTimer);
+    if (this.redis) {
+      this.redis.disconnect();
+    }
+  }
 }

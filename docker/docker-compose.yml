@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   anonamoose:
     build:
@@ -14,16 +12,19 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - MGMT_PORT=3001
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - API_TOKEN=${API_TOKEN:-}
-      - STATS_TOKEN=${STATS_TOKEN:-}
+      - API_TOKEN=${API_TOKEN}
+      - STATS_TOKEN=${STATS_TOKEN}
     depends_on:
       redis:
         condition: service_healthy
     volumes:
       - dictionary-data:/app/data
+    networks:
+      - frontend
+      - backend
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
@@ -33,12 +34,14 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
+    networks:
+      - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$REDIS_PASSWORD redis-cli ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,10 +53,16 @@ services:
     ports:
       - "3102:3002"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3100
-      - STATS_TOKEN=${STATS_TOKEN:-}
+      - API_URL=http://anonamoose:3000
+      - STATS_TOKEN=${STATS_TOKEN}
+    networks:
+      - frontend
     restart: unless-stopped
 
 volumes:
   dictionary-data:
   redis-data:
+
+networks:
+  frontend:
+  backend:

@@ -194,11 +194,15 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
     country: ['UK']
   },
   
-  // UK Passport Number
+  // UK Passport Number (9 digits, validated range)
   {
     id: 'uk-passport',
     name: 'UK_PASSPORT',
     pattern: /\b\d{9}\b/g,
+    validator: (match: string) => {
+      const num = parseInt(match, 10);
+      return num >= 100000000 && num <= 999999999;
+    },
     confidence: 0.75,
     country: ['UK']
   },
@@ -295,22 +299,13 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
     country: ['UK']
   },
   
-  // Australian Postcode
+  // AU/NZ Postcode (4-digit)
   {
-    id: 'au-postcode',
-    name: 'AU_POSTCODE',
+    id: 'anz-postcode',
+    name: 'ANZ_POSTCODE',
     pattern: /\b\d{4}\b/g,
     confidence: 0.70,
-    country: ['AU']
-  },
-  
-  // NZ Postcode
-  {
-    id: 'nz-postcode',
-    name: 'NZ_POSTCODE',
-    pattern: /\b\d{4}\b/g,
-    confidence: 0.70,
-    country: ['NZ']
+    country: ['AU', 'NZ']
   },
   
   // Australian Address Patterns (common formats)

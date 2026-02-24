@@ -1,6 +1,8 @@
 import { timingSafeEqual } from 'crypto';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
 import type { ProxyConfig, ChatMessage, RedactionConfig } from '../core/types.js';
 import { RedactionPipeline } from '../core/redaction/pipeline.js';
@@ -50,10 +52,17 @@ export class ProxyServer {
   }
 
   private setupMiddleware(): void {
+    this.app.use(helmet());
     this.app.use(cors({
       origin: process.env.CORS_ORIGIN || false,
     }));
-    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.json({ limit: '1mb' }));
+    this.app.use(rateLimit({
+      windowMs: 60_000,
+      max: 120,
+      standardHeaders: true,
+      legacyHeaders: false,
+    }));
   }
 
   private setupErrorHandler(): void {
@@ -82,8 +91,7 @@ export class ProxyServer {
   private isAuthenticated(req: Request): boolean {
     const apiToken = process.env.API_TOKEN;
     if (!apiToken) {
-      console.warn('WARNING: API_TOKEN not set — management API is unprotected');
-      return true;
+      return false;
     }
 
     const authHeader = req.headers.authorization;
@@ -140,7 +148,6 @@ export class ProxyServer {
 
   private setupManagementAPI(): void {
     const api = express.Router();
-    api.use(express.json());
 
     // Protected routes — require API_TOKEN
     api.use((req: Request, res: Response, next: NextFunction) => {
@@ -217,7 +224,8 @@ export class ProxyServer {
         this.stats.requestsHydrated++;
         res.json({ text: hydrated });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('Hydrate error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -241,7 +249,8 @@ export class ProxyServer {
           storage: storageStats
         });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -251,7 +260,8 @@ export class ProxyServer {
         const stats = await this.rehydrationStore.getStorageStats();
         res.json(stats);
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -268,7 +278,8 @@ export class ProxyServer {
         }));
         res.json({ sessions: redacted });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -283,9 +294,14 @@ export class ProxyServer {
         }
 
         const sessions = await this.rehydrationStore.search(q);
-        res.json({ sessions, count: sessions.length });
+        const redacted = sessions.map(s => ({
+          ...s,
+          tokens: s.tokens.map(t => ({ ...t, original: '[REDACTED]' })),
+        }));
+        res.json({ sessions: redacted, count: redacted.length });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -300,9 +316,14 @@ export class ProxyServer {
           return;
         }
 
-        res.json(session);
+        const redacted = {
+          ...session,
+          tokens: session.tokens.map(t => ({ ...t, original: '[REDACTED]' })),
+        };
+        res.json(redacted);
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -319,7 +340,8 @@ export class ProxyServer {
 
         res.json({ success: true, deletedSessionId: id });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -329,7 +351,8 @@ export class ProxyServer {
         const deleted = await this.rehydrationStore.deleteAll();
         res.json({ success: true, deletedCount: deleted });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -340,6 +363,10 @@ export class ProxyServer {
         const { ttl } = req.body;
 
         const ttlSeconds = typeof ttl === 'number' ? ttl : 3600;
+        if (ttlSeconds < 1 || ttlSeconds > 86400) {
+          res.status(400).json({ error: 'ttl must be between 1 and 86400 seconds' });
+          return;
+        }
         const extended = await this.rehydrationStore.extend(id, ttlSeconds);
 
         if (!extended) {
@@ -349,7 +376,8 @@ export class ProxyServer {
 
         res.json({ success: true, sessionId: id, ttl: ttlSeconds });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -374,6 +402,17 @@ export class ProxyServer {
           return;
         }
 
+        for (const [key, value] of Object.entries(tokens)) {
+          if (typeof key !== 'string' || typeof value !== 'string') {
+            res.status(400).json({ error: 'All token keys and values must be strings' });
+            return;
+          }
+          if (key.length > 500 || (value as string).length > 5000) {
+            res.status(400).json({ error: 'Token key/value exceeds size limit' });
+            return;
+          }
+        }
+
         const tokenMap = new Map<string, string>(Object.entries(tokens));
         const ttlSeconds = typeof ttl === 'number' ? ttl : 3600;
 
@@ -381,7 +420,8 @@ export class ProxyServer {
 
         res.json({ success: true, sessionId: id });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
@@ -395,33 +435,46 @@ export class ProxyServer {
           dictionarySize: ((this.redactionPipeline as any).getDictionary() as DictionaryService).size()
         });
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
       }
     });
 
     this.app.use('/api/v1', api);
   }
 
+  private static readonly SESSION_ID_REGEX = /^[a-f0-9\-]{36}$/i;
+  private static readonly MAX_TOKENS_PER_SESSION = 10000;
+
   private getSessionId(req: Request): string {
-    return (req.headers['x-anonamoose-session'] as string) || uuidv4();
+    const header = req.headers['x-anonamoose-session'] as string;
+    if (header && ProxyServer.SESSION_ID_REGEX.test(header)) {
+      return header;
+    }
+    return uuidv4();
   }
 
   private shouldRedact(req: Request): boolean {
     const header = req.headers['x-anonamoose-redact'];
-    return header !== 'false';
+    return typeof header !== 'string' || header.toLowerCase() !== 'false';
   }
 
   private shouldHydrate(req: Request): boolean {
     const header = req.headers['x-anonamoose-hydrate'];
-    return header !== 'false';
+    return typeof header !== 'string' || header.toLowerCase() !== 'false';
   }
 
   private async handleRedact(req: Request, res: Response): Promise<void> {
     const sessionId = this.getSessionId(req);
     const { text } = req.body;
 
-    if (!text) {
-      res.status(400).json({ error: 'text is required' });
+    if (!text || typeof text !== 'string') {
+      res.status(400).json({ error: 'text must be a non-empty string' });
+      return;
+    }
+
+    if (text.length > 100_000) {
+      res.status(400).json({ error: 'text exceeds maximum length of 100,000 characters' });
       return;
     }
 
@@ -526,7 +579,7 @@ export class ProxyServer {
     let requestBody = { ...req.body };
 
     if (redact) {
-      if (requestBody.system) {
+      if (typeof requestBody.system === 'string') {
         const systemResult = await this.redactionPipeline.redact(requestBody.system, sessionId);
         this.storeTokens(sessionId, systemResult.tokens);
         const tokensByType = new Map<string, Map<string, string>>();
@@ -600,6 +653,37 @@ export class ProxyServer {
         }
 
         result.push({ ...msg, content: redactionResult.redactedText });
+      } else if (Array.isArray(msg.content)) {
+        const redactedBlocks = [];
+        for (const block of msg.content) {
+          if (block.type === 'text' && typeof block.text === 'string') {
+            const blockResult = await this.redactionPipeline.redact(block.text, sessionId);
+            this.storeTokens(sessionId, blockResult.tokens);
+
+            const tokensByType = new Map<string, Map<string, string>>();
+            for (const [token, original] of blockResult.tokens) {
+              const pii = blockResult.detectedPII.find(p => p.value === original);
+              const type = pii?.type || 'regex';
+              if (!tokensByType.has(type)) tokensByType.set(type, new Map());
+              tokensByType.get(type)!.set(token, original);
+            }
+            for (const [type, tokens] of tokensByType) {
+              await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'ner', 'MESSAGE');
+            }
+
+            this.stats.piiDetected += blockResult.detectedPII.length;
+            for (const pii of blockResult.detectedPII) {
+              if (pii.type === 'dictionary') this.stats.dictionaryHits++;
+              else if (pii.type === 'regex') this.stats.regexHits++;
+              else if (pii.type === 'ner') this.stats.nerHits++;
+            }
+
+            redactedBlocks.push({ ...block, text: blockResult.redactedText });
+          } else {
+            redactedBlocks.push(block);
+          }
+        }
+        result.push({ ...msg, content: redactedBlocks });
       } else {
         result.push(msg);
       }
@@ -612,6 +696,7 @@ export class ProxyServer {
     const existing = this.sessionTokens.get(sessionId);
     const map = existing?.tokens || new Map();
     for (const [k, v] of tokens) {
+      if (map.size >= ProxyServer.MAX_TOKENS_PER_SESSION) break;
       map.set(k, v);
     }
     this.sessionTokens.set(sessionId, { tokens: map, createdAt: existing?.createdAt || Date.now() });
@@ -753,7 +838,7 @@ export class ProxyServer {
 
   private sendError(res: Response, err: any): void {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || 'Unknown error';
+    const message = status >= 500 ? 'Internal server error' : (err.message || 'Unknown error');
 
     res.status(status).json({
       error: {
@@ -768,10 +853,14 @@ export class ProxyServer {
       this.app.listen(this.config.port, () => {
         console.log(`Anonamoose proxy running on port ${this.config.port}`);
         if (!process.env.API_TOKEN) {
-          console.warn('WARNING: API_TOKEN not set — management API is unprotected');
+          console.warn('WARNING: API_TOKEN not set — management API will reject all requests');
         }
         resolve();
       });
     });
+  }
+
+  destroy(): void {
+    clearInterval(this.sessionCleanupTimer);
   }
 }
