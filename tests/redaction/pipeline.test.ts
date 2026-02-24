@@ -205,6 +205,17 @@ describe('Redaction Pipeline', () => {
       const result = await pipeline.redact('test@example.com', 'my-session');
       expect(result.rehydrationKey).toBe('my-session');
     });
+
+    it('should expose dictionary via getDictionary()', async () => {
+      const pipeline = await createPipeline(
+        { enableDictionary: true, enableRegex: false, enableNER: false },
+        ['Test Term']
+      );
+      const dict = pipeline.getDictionary();
+      expect(dict).toBeDefined();
+      expect(dict.size()).toBe(1);
+      expect(dict.list()[0].term).toBe('Test Term');
+    });
   });
 
   describe('Synthetic PII Scenarios', () => {

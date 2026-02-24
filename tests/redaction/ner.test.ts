@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { NERLayer } from '../../src/core/redaction/ner-layer.js';
+import type { RawEntity } from '../../src/core/redaction/ner-layer.js';
 
 describe('NER Layer (Transformer)', () => {
   let nerLayer: NERLayer;
@@ -89,4 +90,120 @@ describe('NER Layer (Transformer)', () => {
     expect(result.tokens.size).toBe(0);
     expect(result.text).toBe('The quick brown fox jumps over the lazy dog');
   }, 30000);
+
+  it('should skip text exceeding MAX_INPUT_LENGTH', async () => {
+    const longText = 'A'.repeat(10_001);
+    const result = await nerLayer.redact(longText);
+
+    expect(result.text).toBe(longText);
+    expect(result.detections).toHaveLength(0);
+    expect(result.tokens.size).toBe(0);
+  });
+
+  it('should reset internal counter', () => {
+    const layer = new NERLayer();
+    layer.reset();
+    expect(() => layer.reset()).not.toThrow();
+  });
+
+  it('should return unmodified text when pipeline is unavailable (circuit breaker)', async () => {
+    // Save current state
+    const origPipeline = (NERLayer as any).pipelineInstance;
+    const origFailed = (NERLayer as any).loadFailed;
+    const origLastAttempt = (NERLayer as any).lastLoadAttempt;
+
+    try {
+      // Simulate a recent load failure (circuit breaker open)
+      (NERLayer as any).pipelineInstance = null;
+      (NERLayer as any).loadFailed = true;
+      (NERLayer as any).lastLoadAttempt = Date.now();
+
+      const layer = new NERLayer({ minConfidence: 0.5 });
+      const result = await layer.redact('John Smith works at Google');
+
+      // Should return text unmodified since pipeline is unavailable
+      expect(result.text).toBe('John Smith works at Google');
+      expect(result.detections).toHaveLength(0);
+      expect(result.tokens.size).toBe(0);
+    } finally {
+      // Restore state
+      (NERLayer as any).pipelineInstance = origPipeline;
+      (NERLayer as any).loadFailed = origFailed;
+      (NERLayer as any).lastLoadAttempt = origLastAttempt;
+    }
+  });
+});
+
+describe('NER mergeEntities (unit)', () => {
+  it('should merge B- followed by same-category I- tokens', () => {
+    const entities: RawEntity[] = [
+      { entity: 'B-PER', score: 0.95, index: 1, word: 'Sarah' },
+      { entity: 'I-PER', score: 0.90, index: 2, word: 'Johnson' },
+    ];
+    const merged = NERLayer.mergeEntities(entities);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].word).toBe('Sarah Johnson');
+    expect(merged[0].category).toBe('PERSON');
+    expect(merged[0].score).toBeCloseTo(0.925);
+  });
+
+  it('should merge WordPiece subword tokens (## prefix)', () => {
+    const entities: RawEntity[] = [
+      { entity: 'B-PER', score: 0.92, index: 1, word: 'Wolf' },
+      { entity: 'I-PER', score: 0.88, index: 2, word: '##gang' },
+    ];
+    const merged = NERLayer.mergeEntities(entities);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].word).toBe('Wolfgang');
+  });
+
+  it('should start new entity on category mismatch I- tag', () => {
+    const entities: RawEntity[] = [
+      { entity: 'B-PER', score: 0.95, index: 1, word: 'John' },
+      { entity: 'I-ORG', score: 0.85, index: 2, word: 'Corp' },
+    ];
+    const merged = NERLayer.mergeEntities(entities);
+    expect(merged).toHaveLength(2);
+    expect(merged[0].category).toBe('PERSON');
+    expect(merged[0].word).toBe('John');
+    expect(merged[1].category).toBe('ORG');
+    expect(merged[1].word).toBe('Corp');
+  });
+
+  it('should handle multiple separate entities', () => {
+    const entities: RawEntity[] = [
+      { entity: 'B-PER', score: 0.95, index: 1, word: 'Alice' },
+      { entity: 'B-LOC', score: 0.90, index: 3, word: 'London' },
+      { entity: 'B-ORG', score: 0.88, index: 5, word: 'Google' },
+    ];
+    const merged = NERLayer.mergeEntities(entities);
+    expect(merged).toHaveLength(3);
+    expect(merged[0].category).toBe('PERSON');
+    expect(merged[1].category).toBe('LOCATION');
+    expect(merged[2].category).toBe('ORG');
+  });
+
+  it('should ignore orphan I- tag with no preceding entity', () => {
+    const entities: RawEntity[] = [
+      { entity: 'I-PER', score: 0.90, index: 1, word: 'Smith' },
+    ];
+    const merged = NERLayer.mergeEntities(entities);
+    expect(merged).toHaveLength(0);
+  });
+
+  it('should handle empty input', () => {
+    const merged = NERLayer.mergeEntities([]);
+    expect(merged).toHaveLength(0);
+  });
+
+  it('should map BIO labels to categories', () => {
+    const entities: RawEntity[] = [
+      { entity: 'B-PER', score: 0.9, index: 1, word: 'Alice' },
+      { entity: 'B-ORG', score: 0.9, index: 2, word: 'Acme' },
+      { entity: 'B-LOC', score: 0.9, index: 3, word: 'Paris' },
+      { entity: 'B-MISC', score: 0.9, index: 4, word: 'French' },
+    ];
+    const merged = NERLayer.mergeEntities(entities);
+    expect(merged.map(m => m.category)).toEqual(['PERSON', 'ORG', 'LOCATION', 'MISC']);
+  });
 });

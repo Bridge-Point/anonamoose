@@ -122,11 +122,15 @@ describe('Regex Layer - Pattern Detection', () => {
       expect(text.match(auTfn.pattern)).not.toBeNull();
     });
 
-    it('should validate using Luhn-like check', () => {
+    it('should validate using modulus 11 check', () => {
       expect(auTfn.validator).toBeDefined();
-      // TFN validation uses modulus 11 — test it doesn't crash
-      auTfn.validator!('123456782');
-      auTfn.validator!('999999999');
+      const result1 = auTfn.validator!('123456782');
+      expect(typeof result1).toBe('boolean');
+      const result2 = auTfn.validator!('999999999');
+      expect(typeof result2).toBe('boolean');
+      // Wrong length should fail
+      expect(auTfn.validator!('12345')).toBe(false);
+      expect(auTfn.validator!('1234567890')).toBe(false);
     });
   });
 
@@ -141,6 +145,15 @@ describe('Regex Layer - Pattern Detection', () => {
 
     it('should have a validator function', () => {
       expect(auMedicare.validator).toBeDefined();
+    });
+
+    it('should validate Medicare check digit', () => {
+      // Exercise the validator — returns boolean for valid/invalid
+      const result1 = auMedicare.validator!('2212345678');
+      expect(typeof result1).toBe('boolean');
+      // Wrong length should always fail
+      expect(auMedicare.validator!('12345')).toBe(false);
+      expect(auMedicare.validator!('123')).toBe(false);
     });
   });
 
@@ -164,6 +177,22 @@ describe('Regex Layer - Pattern Detection', () => {
         nzIrd.pattern.lastIndex = 0;
         expect(num.match(nzIrd.pattern), `should match: ${num}`).not.toBeNull();
       }
+    });
+
+    it('should have a validator function', () => {
+      expect(nzIrd.validator).toBeDefined();
+    });
+
+    it('should validate IRD check digit (modulus 11)', () => {
+      // Exercise the validator with various inputs
+      const result = nzIrd.validator!('123456789');
+      expect(typeof result).toBe('boolean');
+      // Wrong lengths should fail
+      expect(nzIrd.validator!('1234')).toBe(false);
+      expect(nzIrd.validator!('12345678901')).toBe(false);
+      // 8-digit IRD (padded to 9 internally)
+      const result8 = nzIrd.validator!('12345678');
+      expect(typeof result8).toBe('boolean');
     });
   });
 

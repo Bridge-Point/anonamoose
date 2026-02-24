@@ -181,6 +181,7 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
     id: 'nz-ird',
     name: 'NZ_IRD',
     pattern: /\b\d{2,3}[ -]?\d{4,5}[ -]?\d{3}\b/g,
+    validator: nzIrdCheck,
     confidence: 0.95,
     country: ['NZ']
   },

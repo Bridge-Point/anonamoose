@@ -18,14 +18,14 @@ export interface NERRedactResult {
   detections: PIIDetection[];
 }
 
-interface RawEntity {
+export interface RawEntity {
   entity: string;
   score: number;
   index: number;
   word: string;
 }
 
-interface MergedEntity {
+export interface MergedEntity {
   category: string;
   word: string;
   score: number;
@@ -104,7 +104,7 @@ export class NERLayer {
     );
 
     // Merge subword tokens into full entity spans
-    const merged = this.mergeEntities(bioEntities);
+    const merged = NERLayer.mergeEntities(bioEntities);
 
     // Deduplicate entity words
     const uniqueEntities = [...new Map(merged.map(e => [e.word, e])).values()];
@@ -160,7 +160,8 @@ export class NERLayer {
     return { text: result, tokens, detections };
   }
 
-  private mergeEntities(entities: RawEntity[]): MergedEntity[] {
+  /** @internal Exposed as static for testing */
+  static mergeEntities(entities: RawEntity[]): MergedEntity[] {
     const merged: MergedEntity[] = [];
 
     for (const entity of entities) {

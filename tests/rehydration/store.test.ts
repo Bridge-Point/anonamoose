@@ -177,4 +177,57 @@ describe('RehydrationStore (in-memory)', () => {
     const session = await store.retrieve(VALID_SESSION_ID);
     expect(session).toBeNull();
   });
+
+  it('should return 0 from cleanup (in-memory TTL handled elsewhere)', async () => {
+    const count = await store.cleanup();
+    expect(count).toBe(0);
+  });
+
+  it('should destroy without error', () => {
+    const tempStore = new RehydrationStore();
+    expect(() => tempStore.destroy()).not.toThrow();
+  });
+
+  it('should search by category', async () => {
+    const tokens = new Map([['\uE000t1\uE001', 'data']]);
+    await store.store(VALID_SESSION_ID, tokens, 3600, 'regex', 'EMAIL');
+
+    const results = await store.search('email');
+    expect(results).toHaveLength(1);
+  });
+
+  it('should search by meta values', async () => {
+    const tokens = new Map([['\uE000t1\uE001', 'data']]);
+    await store.store(VALID_SESSION_ID, tokens, 3600, 'regex', 'PII', { source: 'proxy' });
+
+    const results = await store.search('proxy');
+    expect(results).toHaveLength(1);
+  });
+
+  it('should return empty search for no matches', async () => {
+    const tokens = new Map([['\uE000t1\uE001', 'data']]);
+    await store.store(VALID_SESSION_ID, tokens);
+
+    const results = await store.search('nonexistent_query_xyz');
+    expect(results).toHaveLength(0);
+  });
+
+  it('should store with different token types', async () => {
+    const tokens = new Map([['\uE000t1\uE001', 'Sarah']]);
+    await store.store(VALID_SESSION_ID, tokens, 3600, 'ner', 'PERSON');
+
+    const session = await store.retrieve(VALID_SESSION_ID);
+    expect(session!.tokens[0].type).toBe('ner');
+    expect(session!.tokens[0].category).toBe('PERSON');
+  });
+
+  it('should reject invalid session ID on delete', async () => {
+    const result = await store.delete('bad-id');
+    expect(result).toBe(false);
+  });
+
+  it('should reject invalid session ID on extend', async () => {
+    const result = await store.extend('bad-id', 3600);
+    expect(result).toBe(false);
+  });
 });
