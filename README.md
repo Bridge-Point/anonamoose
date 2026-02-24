@@ -1,5 +1,7 @@
 # Anonamoose
 
+[![CI](https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml/badge.svg)](https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml)
+
 > **License Notice:** Anonamoose is free for personal projects and non-commercial use. If you or your organisation are using Anonamoose to generate revenue, provide services to customers, or operate as part of a business (including not-for-profits), you need a commercial license. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz) for licensing. See [LICENSE](./LICENSE) for full terms.
 
 LLM Anonymization Proxy — Guaranteed PII Redaction with Rehydration.
