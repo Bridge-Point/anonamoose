@@ -230,4 +230,80 @@ describe('RehydrationStore (in-memory)', () => {
     const result = await store.extend('bad-id', 3600);
     expect(result).toBe(false);
   });
+
+  // ── cleanupExpired (in-memory path) ─────────────────────────
+  it('should clean up expired sessions when cleanupExpired runs', async () => {
+    const storeAny = store as any;
+
+    // Insert an already-expired session directly into localSessions
+    storeAny.localSessions.set(VALID_SESSION_ID, {
+      sessionId: VALID_SESSION_ID,
+      tokens: [],
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() - 1000).toISOString(), // expired 1s ago
+      lastAccessedAt: new Date().toISOString(),
+    });
+
+    expect(storeAny.localSessions.size).toBe(1);
+
+    // Trigger cleanup
+    storeAny.cleanupExpired();
+
+    expect(storeAny.localSessions.size).toBe(0);
+  });
+
+  it('should not clean up non-expired sessions', async () => {
+    const storeAny = store as any;
+
+    storeAny.localSessions.set(VALID_SESSION_ID, {
+      sessionId: VALID_SESSION_ID,
+      tokens: [],
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(), // 1hr from now
+      lastAccessedAt: new Date().toISOString(),
+    });
+
+    storeAny.cleanupExpired();
+    expect(storeAny.localSessions.size).toBe(1);
+  });
+
+  // ── evictIfNeeded ───────────────────────────────────────────
+  it('should evict oldest 10% when at capacity', () => {
+    const storeAny = store as any;
+
+    // Manually fill localSessions to MAX_LOCAL_SESSIONS (10000)
+    for (let i = 0; i < 10000; i++) {
+      const id = `${i.toString(16).padStart(8, '0')}-0000-0000-0000-000000000000`;
+      storeAny.localSessions.set(id, {
+        sessionId: id,
+        tokens: [],
+        createdAt: new Date(Date.now() - (10000 - i) * 1000).toISOString(), // oldest first
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        lastAccessedAt: new Date().toISOString(),
+      });
+    }
+
+    expect(storeAny.localSessions.size).toBe(10000);
+
+    // Trigger eviction
+    storeAny.evictIfNeeded();
+
+    // Should have evicted 10% = 1000 oldest sessions
+    expect(storeAny.localSessions.size).toBe(9000);
+  });
+
+  it('should not evict when under capacity', () => {
+    const storeAny = store as any;
+
+    storeAny.localSessions.set(VALID_SESSION_ID, {
+      sessionId: VALID_SESSION_ID,
+      tokens: [],
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      lastAccessedAt: new Date().toISOString(),
+    });
+
+    storeAny.evictIfNeeded();
+    expect(storeAny.localSessions.size).toBe(1);
+  });
 });
