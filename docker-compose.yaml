@@ -6,7 +6,9 @@
 
 services:
   anonamoose:
-    image: ghcr.io/bridge-point/anonamoose:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     environment:
       - SERVICE_FQDN_ANONAMOOSE_3000
       - NODE_ENV=production
@@ -40,7 +42,9 @@ services:
       retries: 10
 
   ui:
-    image: ghcr.io/bridge-point/anonamoose-ui:latest
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
     environment:
       - SERVICE_FQDN_UI_3002
       - API_URL=http://anonamoose:3000
