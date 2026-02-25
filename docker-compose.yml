@@ -1,21 +1,23 @@
-# Local development docker-compose
-# For Coolify deployment, use the root docker-compose.yml instead
+# documentation: https://docs.anonamoose.net
+# slogan: LLM Anonymization Proxy — Guaranteed PII Redaction with Rehydration
+# tags: llm,pii,anonymization,redaction,privacy,proxy,openai,anthropic
+# logo: svgs/anonamoose.svg
+# port: 3000
 
 services:
   anonamoose:
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile
-    ports:
-      - "${PROXY_PORT:-3100}:3000"
-      - "${MGMT_PORT:-3101}:3001"
-    env_file:
-      - ../.env
     environment:
       - NODE_ENV=production
       - PORT=3000
       - MGMT_PORT=3001
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-anonamoose}@redis:6379
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - API_TOKEN=${API_TOKEN:-}
+      - STATS_TOKEN=${SERVICE_PASSWORD_STATS}
     depends_on:
       redis:
         condition: service_healthy
@@ -33,27 +35,25 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD:-anonamoose}
+    command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
       - redis-data:/data
     networks:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-anonamoose}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   ui:
     build:
-      context: ../ui
+      context: ./ui
       dockerfile: Dockerfile
-    ports:
-      - "${UI_PORT:-3102}:3002"
     environment:
       - API_URL=http://anonamoose:3000
-      - STATS_TOKEN=${STATS_TOKEN}
+      - STATS_TOKEN=${SERVICE_PASSWORD_STATS}
     networks:
       - frontend
     restart: unless-stopped

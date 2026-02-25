@@ -5,6 +5,8 @@ node_modules
 tests
 docs
 ui
+coverage
 *.md
 .DS_Store
 .claude
+.github
