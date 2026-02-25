@@ -2,7 +2,17 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+function verifyAdmin(request: Request): boolean {
+  const token = request.headers.get('x-admin-token');
+  const statsToken = process.env.STATS_TOKEN || '';
+  return !!statsToken && token === statsToken;
+}
+
 export async function GET(request: Request) {
+  if (!verifyAdmin(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
   const token = process.env.STATS_TOKEN || '';
 
@@ -21,7 +31,11 @@ export async function GET(request: Request) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  if (!verifyAdmin(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
   const token = process.env.STATS_TOKEN || '';
 

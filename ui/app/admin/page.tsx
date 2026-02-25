@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Shield, Trash2, Search, RefreshCw, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { Shield, Trash2, Search, RefreshCw, ArrowLeft, AlertTriangle, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 
@@ -24,7 +24,75 @@ interface Session {
 
 type Tab = 'logs' | 'sessions';
 
+function LoginScreen({ onLogin }: { onLogin: (token: string) => void }) {
+  const [token, setToken] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      if (res.ok) {
+        sessionStorage.setItem('admin_token', token);
+        onLogin(token);
+      } else {
+        setError('Invalid token');
+      }
+    } catch {
+      setError('Failed to verify token');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <Card className="w-[400px]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5 text-blue-600" />
+            Admin Authentication
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Token</label>
+              <input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Enter STATS_TOKEN"
+                className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || !token}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? 'Verifying...' : 'Sign In'}
+            </button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPanel() {
+  const [adminToken, setAdminToken] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('logs');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logTotal, setLogTotal] = useState(0);
@@ -34,15 +102,26 @@ export default function AdminPanel() {
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [confirmFlush, setConfirmFlush] = useState(false);
 
+  useEffect(() => {
+    const stored = sessionStorage.getItem('admin_token');
+    if (stored) setAdminToken(stored);
+  }, []);
+
+  const authHeaders = useCallback(() => ({
+    'X-Admin-Token': adminToken || '',
+  }), [adminToken]);
+
   const showMessage = (text: string, type: 'success' | 'error') => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 3000);
   };
 
   const fetchLogs = useCallback(async () => {
+    if (!adminToken) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/logs?limit=200');
+      const res = await fetch('/api/logs?limit=200', { headers: authHeaders() });
+      if (res.status === 401) { setAdminToken(null); sessionStorage.removeItem('admin_token'); return; }
       const data = await res.json();
       setLogs(data.logs || []);
       setLogTotal(data.total || 0);
@@ -51,10 +130,10 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [adminToken, authHeaders]);
 
   const clearLogs = async () => {
-    const res = await fetch('/api/logs', { method: 'DELETE' });
+    const res = await fetch('/api/logs', { method: 'DELETE', headers: authHeaders() });
     if (res.ok) {
       setLogs([]);
       setLogTotal(0);
@@ -63,10 +142,12 @@ export default function AdminPanel() {
   };
 
   const fetchSessions = useCallback(async (query?: string) => {
+    if (!adminToken) return;
     setLoading(true);
     try {
       const url = query ? `/api/sessions?q=${encodeURIComponent(query)}` : '/api/sessions';
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: authHeaders() });
+      if (res.status === 401) { setAdminToken(null); sessionStorage.removeItem('admin_token'); return; }
       const data = await res.json();
       setSessions(data.sessions || []);
     } catch {
@@ -74,10 +155,10 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [adminToken, authHeaders]);
 
   const deleteSession = async (id: string) => {
-    const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE', headers: authHeaders() });
     if (res.ok) {
       setSessions(prev => prev.filter(s => s.sessionId !== id));
       showMessage('Session deleted', 'success');
@@ -87,7 +168,7 @@ export default function AdminPanel() {
   };
 
   const flushAll = async () => {
-    const res = await fetch('/api/sessions', { method: 'DELETE' });
+    const res = await fetch('/api/sessions', { method: 'DELETE', headers: authHeaders() });
     if (res.ok) {
       const data = await res.json();
       setSessions([]);
@@ -98,17 +179,26 @@ export default function AdminPanel() {
     }
   };
 
+  const logout = () => {
+    setAdminToken(null);
+    sessionStorage.removeItem('admin_token');
+  };
+
   useEffect(() => {
+    if (!adminToken) return;
     if (tab === 'logs') fetchLogs();
     if (tab === 'sessions') fetchSessions();
-  }, [tab, fetchLogs, fetchSessions]);
+  }, [tab, adminToken, fetchLogs, fetchSessions]);
 
-  // Auto-refresh logs every 5 seconds
   useEffect(() => {
-    if (tab !== 'logs') return;
+    if (!adminToken || tab !== 'logs') return;
     const interval = setInterval(fetchLogs, 5000);
     return () => clearInterval(interval);
-  }, [tab, fetchLogs]);
+  }, [tab, adminToken, fetchLogs]);
+
+  if (!adminToken) {
+    return <LoginScreen onLogin={setAdminToken} />;
+  }
 
   const statusColor = (status: number) => {
     if (status < 300) return 'text-green-600';
@@ -138,11 +228,16 @@ export default function AdminPanel() {
               <Shield className="h-8 w-8 text-blue-600" />
               <h1 className="text-2xl font-bold">Admin Panel</h1>
             </div>
-            {message && (
-              <span className={`text-sm px-3 py-1 rounded ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {message.text}
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {message && (
+                <span className={`text-sm px-3 py-1 rounded ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {message.text}
+                </span>
+              )}
+              <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1 hover:bg-gray-100 rounded">
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </header>

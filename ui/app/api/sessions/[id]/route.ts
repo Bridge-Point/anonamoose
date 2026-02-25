@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+function verifyAdmin(request: Request): boolean {
+  const token = request.headers.get('x-admin-token');
+  const statsToken = process.env.STATS_TOKEN || '';
+  return !!statsToken && token === statsToken;
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!verifyAdmin(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
   const token = process.env.STATS_TOKEN || '';
   const { id } = await params;
