@@ -1,20 +1,27 @@
-FROM node:20-alpine
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
-
 RUN npm ci
 
 COPY . .
 
 RUN npm run build
 
-RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001
+FROM node:20-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+RUN groupadd -g 1001 appuser && useradd -u 1001 -g appuser -s /bin/false appuser
 USER appuser
 
 EXPOSE 3002
 
 ENV NODE_ENV=production
+ENV PORT=3002
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
