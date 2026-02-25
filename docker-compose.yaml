@@ -10,6 +10,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     environment:
+      - SERVICE_FQDN_ANONAMOOSE_3000
       - NODE_ENV=production
       - PORT=3000
       - MGMT_PORT=3001
@@ -23,45 +24,40 @@ services:
         condition: service_healthy
     volumes:
       - dictionary-data:/app/data
-    networks:
-      - frontend
-      - backend
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
       - redis-data:/data
-    networks:
-      - backend
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   ui:
     build:
       context: ./ui
       dockerfile: Dockerfile
     environment:
+      - SERVICE_FQDN_UI_3002
       - API_URL=http://anonamoose:3000
       - STATS_TOKEN=${SERVICE_PASSWORD_STATS}
-    networks:
-      - frontend
-    restart: unless-stopped
+    depends_on:
+      anonamoose:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3002/"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
 volumes:
   dictionary-data:
   redis-data:
-
-networks:
-  frontend:
-  backend:
