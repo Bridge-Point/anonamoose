@@ -4,8 +4,14 @@ export const dynamic = 'force-dynamic';
 
 function verifyAdmin(request: Request): boolean {
   const token = request.headers.get('x-admin-token');
+  const apiToken = process.env.API_TOKEN || '';
+  return !!apiToken && token === apiToken;
+}
+
+function authHeader(): Record<string, string> {
+  const apiToken = process.env.API_TOKEN || '';
   const statsToken = process.env.STATS_TOKEN || '';
-  return !!statsToken && token === statsToken;
+  return { 'Authorization': `Bearer ${apiToken || statsToken}` };
 }
 
 export async function GET(request: Request) {
@@ -14,8 +20,6 @@ export async function GET(request: Request) {
   }
 
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
-  const token = process.env.STATS_TOKEN || '';
-
   const { searchParams } = new URL(request.url);
   const q = searchParams.get('q');
 
@@ -25,7 +29,7 @@ export async function GET(request: Request) {
 
   try {
     const response = await fetch(endpoint, {
-      headers: { 'Authorization': `Bearer ${token}` },
+      headers: authHeader(),
       cache: 'no-store',
     });
     const data = await response.json();
@@ -41,12 +45,11 @@ export async function DELETE(request: Request) {
   }
 
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
-  const token = process.env.STATS_TOKEN || '';
 
   try {
     const response = await fetch(`${apiUrl}/api/v1/sessions/flush`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
+      headers: authHeader(),
     });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });

@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   const { token } = await request.json();
-  const statsToken = process.env.STATS_TOKEN || '';
+  const apiToken = process.env.API_TOKEN || '';
 
-  if (!statsToken || token !== statsToken) {
+  if (!apiToken || token !== apiToken) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
   }
 

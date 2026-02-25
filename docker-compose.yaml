@@ -60,6 +60,7 @@ services:
       - HOSTNAME=0.0.0.0
       - API_URL=http://anonamoose:3000
       - STATS_TOKEN=${SERVICE_PASSWORD_STATS}
+      - API_TOKEN=${API_TOKEN:-}
     depends_on:
       anonamoose:
         condition: service_healthy

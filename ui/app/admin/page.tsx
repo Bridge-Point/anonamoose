@@ -71,7 +71,7 @@ function LoginScreen({ onLogin }: { onLogin: (token: string) => void }) {
                 type="password"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="Enter STATS_TOKEN"
+                placeholder="Enter API_TOKEN"
                 className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
               />
