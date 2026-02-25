@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
   const statsToken = process.env.STATS_TOKEN || '';
@@ -13,6 +15,7 @@ export async function GET() {
       headers: {
         'Authorization': `Bearer ${statsToken}`,
       },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
