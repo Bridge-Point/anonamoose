@@ -26,6 +26,8 @@ services:
         condition: service_healthy
     volumes:
       - dictionary-data:/app/data
+    networks:
+      - default
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)throw r;process.exit(0)}).catch(()=>process.exit(1))\""]
@@ -38,6 +40,8 @@ services:
     command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
       - redis-data:/data
+    networks:
+      - default
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
@@ -59,6 +63,8 @@ services:
     depends_on:
       anonamoose:
         condition: service_healthy
+    networks:
+      - default
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3002/').then(r=>{if(!r.ok)throw r;process.exit(0)}).catch(()=>process.exit(1))\""]
@@ -69,3 +75,7 @@ services:
 volumes:
   dictionary-data:
   redis-data:
+
+networks:
+  default:
+    driver: bridge
