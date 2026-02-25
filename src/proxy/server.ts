@@ -157,6 +157,20 @@ export class ProxyServer {
       res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
+    // Handle requests without /v1 prefix (some clients strip it from base URL)
+    this.app.post('/chat/completions', (req: Request, res: Response) => {
+      this.handleOpenAI(req, res).catch((err) => {
+        console.error('OpenAI handler error:', err.message);
+        if (!res.headersSent) this.sendError(res, err);
+      });
+    });
+    this.app.post('/messages', (req: Request, res: Response) => {
+      this.handleAnthropic(req, res).catch((err) => {
+        console.error('Anthropic handler error:', err.message);
+        if (!res.headersSent) this.sendError(res, err);
+      });
+    });
+
     // Redact + proxy: chat completions (OpenAI-compatible)
     this.app.post('/v1/chat/completions', (req: Request, res: Response) => {
       this.handleOpenAI(req, res).catch((err) => {
@@ -173,13 +187,16 @@ export class ProxyServer {
       });
     });
 
-    // Pass through all other /v1/* requests to OpenAI (models, embeddings, images, audio, etc.)
-    this.app.all('/v1/*', (req: Request, res: Response) => {
+    // Pass through all other OpenAI requests (models, embeddings, images, audio, etc.)
+    const openaiPassthrough = (req: Request, res: Response) => {
       this.proxyToOpenAI(req, res).catch((err) => {
         console.error('OpenAI passthrough error:', err.message);
         if (!res.headersSent) this.sendError(res, err);
       });
-    });
+    };
+    this.app.all('/v1/*', openaiPassthrough);
+    this.app.all('/models', openaiPassthrough);
+    this.app.all('/embeddings', openaiPassthrough);
 
     // Redaction endpoint — requires auth
     this.app.post('/api/v1/redact', (req: Request, res: Response) => {
@@ -930,7 +947,8 @@ export class ProxyServer {
       return;
     }
 
-    const url = `https://api.openai.com${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
+    const apiPath = req.path.startsWith('/v1/') ? req.path : `/v1${req.path}`;
+    const url = `https://api.openai.com${apiPath}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${apiKey}`,
     };
