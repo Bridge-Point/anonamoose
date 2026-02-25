@@ -149,8 +149,12 @@ export class ProxyServer {
   private setupManagementAPI(): void {
     const api = express.Router();
 
-    // Protected routes — require API_TOKEN
+    // Protected routes — require API_TOKEN (stats endpoints use their own auth)
     api.use((req: Request, res: Response, next: NextFunction) => {
+      if (req.path === '/stats' || req.path === '/stats/public') {
+        next();
+        return;
+      }
       if (!this.isAuthenticated(req)) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
