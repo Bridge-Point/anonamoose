@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY tsconfig.json ./
 
 RUN npm run build
 
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN npm ci --omit=dev --legacy-peer-deps
 
 COPY --from=builder /app/dist ./dist/
 
-RUN addgroup -g 1001 -S appuser && adduser -S appuser -u 1001
+RUN groupadd -g 1001 appuser && useradd -u 1001 -g appuser -s /bin/false appuser
 USER appuser
 
 EXPOSE 3000 3001
