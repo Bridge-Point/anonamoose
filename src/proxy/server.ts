@@ -38,6 +38,7 @@ export class ProxyServer {
     redactionConfig: RedactionConfig = DEFAULT_REDACTION_CONFIG
   ) {
     this.app = express();
+    this.app.set('trust proxy', 1);
     this.rehydrationStore = new RehydrationStore(config.redisUrl);
 
     const dictionary = new DictionaryService();
@@ -117,6 +118,7 @@ export class ProxyServer {
       res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
+    // Redact + proxy: chat completions (OpenAI-compatible)
     this.app.post('/v1/chat/completions', (req: Request, res: Response) => {
       this.handleOpenAI(req, res).catch((err) => {
         console.error('OpenAI handler error:', err.message);
@@ -124,9 +126,18 @@ export class ProxyServer {
       });
     });
 
+    // Redact + proxy: Anthropic messages
     this.app.post('/v1/messages', (req: Request, res: Response) => {
       this.handleAnthropic(req, res).catch((err) => {
         console.error('Anthropic handler error:', err.message);
+        if (!res.headersSent) this.sendError(res, err);
+      });
+    });
+
+    // Pass through all other /v1/* requests to OpenAI (models, embeddings, images, audio, etc.)
+    this.app.all('/v1/*', (req: Request, res: Response) => {
+      this.proxyToOpenAI(req, res).catch((err) => {
+        console.error('OpenAI passthrough error:', err.message);
         if (!res.headersSent) this.sendError(res, err);
       });
     });
@@ -838,6 +849,40 @@ export class ProxyServer {
       reader.releaseLock();
       res.end();
     }
+  }
+
+  private async proxyToOpenAI(req: Request, res: Response): Promise<void> {
+    const apiKey = req.headers.authorization?.replace('Bearer ', '') || this.config.openaiKey;
+    if (!apiKey) {
+      res.status(401).json({ error: { message: 'Missing API key. Provide Bearer token in Authorization header.', type: 'invalid_request_error' } });
+      return;
+    }
+
+    const url = `https://api.openai.com${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${apiKey}`,
+    };
+    if (req.headers['content-type']) {
+      headers['Content-Type'] = req.headers['content-type'] as string;
+    }
+
+    const fetchOptions: RequestInit = {
+      method: req.method,
+      headers,
+    };
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
+      fetchOptions.body = JSON.stringify(req.body);
+    }
+
+    const response = await fetch(url, fetchOptions);
+    res.status(response.status);
+    response.headers.forEach((value, key) => {
+      if (!['content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+        res.setHeader(key, value);
+      }
+    });
+    const data = await response.text();
+    res.send(data);
   }
 
   private sendError(res: Response, err: any): void {
