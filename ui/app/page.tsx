@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, ShieldAlert, ShieldCheck, Activity, Database } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Activity, Database, Settings } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
 
 interface Stats {
   requestsRedacted: number;
@@ -86,11 +87,16 @@ export default function Dashboard() {
               <Shield className="h-8 w-8 text-blue-600" />
               <h1 className="text-2xl font-bold">Anonamoose</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${stats?.redisConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-sm text-gray-600">
-                {stats?.redisConnected ? 'Redis Connected' : 'Redis Disconnected'}
-              </span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${stats?.redisConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="text-sm text-gray-600">
+                  {stats?.redisConnected ? 'Redis Connected' : 'Redis Disconnected'}
+                </span>
+              </div>
+              <Link href="/admin" className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded" title="Admin Panel">
+                <Settings className="h-5 w-5" />
+              </Link>
             </div>
           </div>
         </div>

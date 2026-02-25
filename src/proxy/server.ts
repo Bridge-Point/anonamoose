@@ -18,12 +18,26 @@ interface SessionTokenEntry {
   createdAt: number;
 }
 
+interface RequestLogEntry {
+  timestamp: string;
+  method: string;
+  path: string;
+  status: number;
+  ip: string;
+  duration: number;
+  piiDetected?: number;
+  sessionId?: string;
+}
+
+const MAX_LOG_ENTRIES = 500;
+
 export class ProxyServer {
   private app: express.Application;
   private redactionPipeline: RedactionPipeline;
   private rehydrationStore: RehydrationStore;
   private sessionTokens: Map<string, SessionTokenEntry> = new Map();
   private sessionCleanupTimer: ReturnType<typeof setInterval>;
+  private requestLog: RequestLogEntry[] = [];
   private stats = {
     requestsRedacted: 0,
     requestsHydrated: 0,
@@ -52,7 +66,32 @@ export class ProxyServer {
     this.sessionCleanupTimer = setInterval(() => this.cleanupSessionTokens(), 5 * 60 * 1000);
   }
 
+  private addLogEntry(entry: RequestLogEntry): void {
+    this.requestLog.push(entry);
+    if (this.requestLog.length > MAX_LOG_ENTRIES) {
+      this.requestLog.splice(0, this.requestLog.length - MAX_LOG_ENTRIES);
+    }
+  }
+
   private setupMiddleware(): void {
+    this.app.use((req: Request, res: Response, next: NextFunction) => {
+      const start = Date.now();
+      console.log(`${req.method} ${req.path} [${req.ip}]`);
+      const originalEnd = res.end.bind(res);
+      res.end = ((...args: any[]) => {
+        this.addLogEntry({
+          timestamp: new Date().toISOString(),
+          method: req.method,
+          path: req.path,
+          status: res.statusCode,
+          ip: req.ip || 'unknown',
+          duration: Date.now() - start,
+          sessionId: req.headers['x-anonamoose-session'] as string,
+        });
+        return originalEnd(...args);
+      }) as any;
+      next();
+    });
     this.app.use(helmet());
     this.app.use(cors({
       origin: process.env.CORS_ORIGIN || false,
@@ -160,13 +199,13 @@ export class ProxyServer {
   private setupManagementAPI(): void {
     const api = express.Router();
 
-    // Protected routes — require API_TOKEN (stats endpoints use their own auth)
+    // Protected routes — require API_TOKEN or STATS_TOKEN
     api.use((req: Request, res: Response, next: NextFunction) => {
-      if (req.path === '/stats' || req.path === '/stats/public') {
+      if (req.path === '/stats/public') {
         next();
         return;
       }
-      if (!this.isAuthenticated(req)) {
+      if (!this.isAuthenticated(req) && !this.isStatsAuthenticated(req)) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
@@ -436,6 +475,39 @@ export class ProxyServer {
         res.json({ success: true, sessionId: id });
       } catch (err: any) {
         console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    // Request logs
+    api.get('/logs', (req: Request, res: Response) => {
+      const limit = Math.min(parseInt(req.query.limit as string) || 100, MAX_LOG_ENTRIES);
+      const method = req.query.method as string;
+      const path = req.query.path as string;
+      const status = req.query.status ? parseInt(req.query.status as string) : undefined;
+
+      let logs = [...this.requestLog].reverse();
+
+      if (method) logs = logs.filter(l => l.method === method.toUpperCase());
+      if (path) logs = logs.filter(l => l.path.includes(path));
+      if (status) logs = logs.filter(l => l.status === status);
+
+      res.json({ logs: logs.slice(0, limit), total: this.requestLog.length });
+    });
+
+    // Clear logs
+    api.delete('/logs', (_req: Request, res: Response) => {
+      this.requestLog = [];
+      res.json({ success: true });
+    });
+
+    // Flush all sessions (cache)
+    api.post('/sessions/flush', async (_req: Request, res: Response) => {
+      try {
+        const deleted = await this.rehydrationStore.deleteAll();
+        res.json({ success: true, deletedCount: deleted });
+      } catch (err: any) {
+        console.error('Flush error:', err);
         res.status(500).json({ error: 'Internal server error' });
       }
     });
