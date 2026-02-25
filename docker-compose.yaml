@@ -9,6 +9,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+    expose:
+      - "3000"
     environment:
       - SERVICE_FQDN_ANONAMOOSE_3000
       - NODE_ENV=production
@@ -45,6 +47,8 @@ services:
     build:
       context: ./ui
       dockerfile: Dockerfile
+    expose:
+      - "3002"
     environment:
       - SERVICE_FQDN_UI_3002
       - API_URL=http://anonamoose:3000
