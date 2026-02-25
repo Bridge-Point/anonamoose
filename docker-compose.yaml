@@ -26,6 +26,7 @@ services:
         condition: service_healthy
     volumes:
       - dictionary-data:/app/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)throw r;process.exit(0)}).catch(()=>process.exit(1))\""]
       interval: 5s
@@ -37,6 +38,7 @@ services:
     command: redis-server --requirepass ${SERVICE_PASSWORD_REDIS}
     volumes:
       - redis-data:/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${SERVICE_PASSWORD_REDIS}", "ping"]
       interval: 5s
@@ -51,11 +53,13 @@ services:
       - "3002"
     environment:
       - SERVICE_FQDN_UI_3002
+      - HOSTNAME=0.0.0.0
       - API_URL=http://anonamoose:3000
       - STATS_TOKEN=${SERVICE_PASSWORD_STATS}
     depends_on:
       anonamoose:
         condition: service_healthy
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3002/').then(r=>{if(!r.ok)throw r;process.exit(0)}).catch(()=>process.exit(1))\""]
       interval: 5s
