@@ -52,6 +52,16 @@ export default defineConfig({
             { label: 'Presidio Comparison', slug: 'concepts/presidio-comparison' },
           ],
         },
+        {
+          label: 'Compliance',
+          items: [
+            { label: 'Overview', slug: 'compliance/overview' },
+            { label: 'HIPAA', slug: 'compliance/hipaa' },
+            { label: 'GDPR', slug: 'compliance/gdpr' },
+            { label: 'SOC 2', slug: 'compliance/soc2' },
+            { label: 'ISO 27001', slug: 'compliance/iso27001' },
+          ],
+        },
       ],
     }),
   ],
