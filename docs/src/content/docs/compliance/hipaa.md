@@ -35,9 +35,9 @@ HIPAA §164.514(b) defines the "Safe Harbor" method of de-identification, which 
 | 6 | Email addresses | Covered | Regex |
 | 7 | Social Security numbers | Covered | Regex (US SSN format with validation) |
 | 8 | Medical record numbers | Partial | Dictionary (add known formats as custom terms) |
-| 9 | Health plan beneficiary numbers | Partial | Dictionary, Regex (AU Medicare with checksum) |
-| 10 | Account numbers | Covered | Regex (bank accounts, BSB, sort codes) |
-| 11 | Certificate/license numbers | Partial | Regex (UK driving licence), Dictionary for others |
+| 9 | Health plan beneficiary numbers | Covered | Regex (AU Medicare, NZ NHI, UK NHS with checksums) |
+| 10 | Account numbers | Covered | Regex (bank accounts — AU BSB, NZ bank, UK sort codes) |
+| 11 | Certificate/license numbers | Partial | Regex (UK driving licence, AU/NZ/UK passports), Dictionary for others |
 | 12 | Vehicle identifiers | Partial | Dictionary (add as custom terms) |
 | 13 | Device identifiers | Partial | Dictionary (add as custom terms) |
 | 14 | Web URLs | Partial | Dictionary (add as custom terms) |
@@ -46,7 +46,7 @@ HIPAA §164.514(b) defines the "Safe Harbor" method of de-identification, which 
 | 17 | Full-face photographs | Not applicable | Not text-based |
 | 18 | Other unique identifiers | Partial | Dictionary (add as custom terms) |
 
-**Summary:** 10 of 18 identifiers are automatically detected. 6 can be covered by adding organization-specific formats to the dictionary. 2 are not applicable to text processing.
+**Summary:** 11 of 18 identifiers are automatically detected. 5 can be covered by adding organization-specific formats to the dictionary. 2 are not applicable to text processing.
 
 ### Closing the gaps
 

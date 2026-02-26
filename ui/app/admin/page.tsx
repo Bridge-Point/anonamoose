@@ -1164,6 +1164,7 @@ export default function AdminPanel() {
                         <option value="AU">Australia</option>
                         <option value="NZ">New Zealand</option>
                         <option value="UK">United Kingdom</option>
+                        <option value="US">United States</option>
                       </select>
                       <p className="text-xs text-gray-400 mt-1">
                         {settings.locale

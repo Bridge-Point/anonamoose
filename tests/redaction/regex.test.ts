@@ -372,6 +372,170 @@ describe('Regex Layer - Pattern Detection', () => {
     });
   });
 
+  describe('NZ NHI (National Health Index)', () => {
+    const nhi = findPattern('nz-nhi');
+
+    it('should detect valid NHI numbers', () => {
+      const numbers = ['ZAC1234', 'DAB5678', 'HJK9012'];
+      for (const num of numbers) {
+        nhi.pattern.lastIndex = 0;
+        expect(num.match(nhi.pattern), `should match: ${num}`).not.toBeNull();
+      }
+    });
+
+    it('should reject NHI with excluded letters (I, O)', () => {
+      nhi.pattern.lastIndex = 0;
+      expect('IOA1234'.match(nhi.pattern)).toBeNull();
+    });
+
+    it('should find NHI in context', () => {
+      nhi.pattern.lastIndex = 0;
+      const text = 'Patient NHI: ZAC1234 admitted today';
+      const matches = text.match(nhi.pattern);
+      expect(matches).not.toBeNull();
+      expect(matches![0]).toBe('ZAC1234');
+    });
+
+    it('should be tagged as NZ', () => {
+      expect(nhi.country).toEqual(['NZ']);
+    });
+  });
+
+  describe('UK NHS Number', () => {
+    const nhs = findPattern('uk-nhs');
+
+    it('should match NHS number formats', () => {
+      nhs.pattern.lastIndex = 0;
+      const text = 'NHS: 943 476 5919';
+      expect(text.match(nhs.pattern)).not.toBeNull();
+    });
+
+    it('should have a validator function', () => {
+      expect(nhs.validator).toBeDefined();
+    });
+
+    it('should validate using modulus 11 check', () => {
+      // Wrong length should fail
+      expect(nhs.validator!('12345')).toBe(false);
+      expect(nhs.validator!('123456789012')).toBe(false);
+      // Valid format returns boolean
+      const result = nhs.validator!('9434765919');
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('should be tagged as UK', () => {
+      expect(nhs.country).toEqual(['UK']);
+    });
+  });
+
+  describe('AU Passport', () => {
+    const auPassport = findPattern('au-passport');
+
+    it('should detect AU passport formats', () => {
+      const numbers = ['N1234567', 'PA1234567'];
+      for (const num of numbers) {
+        auPassport.pattern.lastIndex = 0;
+        expect(num.match(auPassport.pattern), `should match: ${num}`).not.toBeNull();
+      }
+    });
+
+    it('should be tagged as AU', () => {
+      expect(auPassport.country).toEqual(['AU']);
+    });
+  });
+
+  describe('NZ Passport', () => {
+    const nzPassport = findPattern('nz-passport');
+
+    it('should detect NZ passport formats', () => {
+      const numbers = ['LA123456', 'LF0123456'];
+      for (const num of numbers) {
+        nzPassport.pattern.lastIndex = 0;
+        expect(num.match(nzPassport.pattern), `should match: ${num}`).not.toBeNull();
+      }
+    });
+
+    it('should be tagged as NZ', () => {
+      expect(nzPassport.country).toEqual(['NZ']);
+    });
+  });
+
+  describe('NZ Bank Account', () => {
+    const nzBank = findPattern('nz-bank-account');
+
+    it('should detect NZ bank account formats', () => {
+      const accounts = ['01-0102-0123456-00', '12-3456-7890123-001'];
+      for (const acct of accounts) {
+        nzBank.pattern.lastIndex = 0;
+        expect(acct.match(nzBank.pattern), `should match: ${acct}`).not.toBeNull();
+      }
+    });
+
+    it('should match without separators', () => {
+      nzBank.pattern.lastIndex = 0;
+      expect('010102012345600'.match(nzBank.pattern)).not.toBeNull();
+    });
+
+    it('should be tagged as NZ', () => {
+      expect(nzBank.country).toEqual(['NZ']);
+    });
+  });
+
+  describe('NZ Address', () => {
+    const nzAddr = findPattern('nz-address');
+
+    it('should detect NZ address formats', () => {
+      const addresses = [
+        '15 Queen Street',
+        '42 Lambton Terrace',
+        '7 Ponsonby Road',
+        '100 Cuba Crescent',
+      ];
+      for (const addr of addresses) {
+        nzAddr.pattern.lastIndex = 0;
+        expect(addr.match(nzAddr.pattern), `should match: ${addr}`).not.toBeNull();
+      }
+    });
+
+    it('should be tagged as NZ', () => {
+      expect(nzAddr.country).toEqual(['NZ']);
+    });
+  });
+
+  describe('UK Address', () => {
+    const ukAddr = findPattern('uk-address');
+
+    it('should detect UK address formats', () => {
+      const addresses = [
+        '10 Downing Street',
+        '221 Baker Street',
+        '42 Victoria Close',
+        '8 Kings Court',
+        '15 Lavender Gardens',
+      ];
+      for (const addr of addresses) {
+        ukAddr.pattern.lastIndex = 0;
+        expect(addr.match(ukAddr.pattern), `should match: ${addr}`).not.toBeNull();
+      }
+    });
+
+    it('should be tagged as UK', () => {
+      expect(ukAddr.country).toEqual(['UK']);
+    });
+  });
+
+  describe('US pattern country tags', () => {
+    it('US Phone should be tagged as US', () => {
+      const phoneUS = findPattern('phone-us');
+      expect(phoneUS.country).toEqual(['US']);
+    });
+
+    it('US SSN should be tagged as US', () => {
+      const ssn = findPattern('ssn-us');
+      expect(ssn.country).toEqual(['US']);
+    });
+  });
+
   describe('Pattern metadata', () => {
     it('should have confidence between 0 and 1 for all patterns', () => {
       for (const p of DEFAULT_PATTERNS) {

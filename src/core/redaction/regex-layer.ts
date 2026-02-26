@@ -65,19 +65,37 @@ const auTfnCheck = (num: string): boolean => {
 const nzIrdCheck = (num: string): boolean => {
   const digits = num.replace(/\D/g, '');
   if (digits.length !== 8 && digits.length !== 9) return false;
-  
+
   const weights = [3, 2, 7, 6, 5, 4, 3, 2];
   let sum = 0;
-  
+
   const paddedDigits = digits.padStart(9, '0');
   for (let i = 0; i < 8; i++) {
     sum += parseInt(paddedDigits[i], 10) * weights[i];
   }
-  
+
   const remainder = sum % 11;
   const expectedCheck = remainder === 0 ? 0 : 11 - remainder;
-  
+
   return parseInt(paddedDigits[8], 10) === expectedCheck;
+};
+
+const ukNhsCheck = (num: string): boolean => {
+  const digits = num.replace(/\D/g, '');
+  if (digits.length !== 10) return false;
+
+  const weights = [10, 9, 8, 7, 6, 5, 4, 3, 2];
+  let sum = 0;
+
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(digits[i], 10) * weights[i];
+  }
+
+  const remainder = sum % 11;
+  const checkDigit = 11 - remainder;
+  if (checkDigit === 11) return parseInt(digits[9], 10) === 0;
+  if (checkDigit === 10) return false;
+  return parseInt(digits[9], 10) === checkDigit;
 };
 
 export const DEFAULT_PATTERNS: RegexPattern[] = [
@@ -139,12 +157,13 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
     confidence: 0.92,
     country: ['UK']
   },
-  // Phone - US (fallback)
+  // Phone - US
   {
     id: 'phone-us',
     name: 'PHONE_US',
     pattern: /(?:\+?1[-.]?)?\(?[2-9]\d{2}\)?[-.]?\d{3}[-.]?\d{4}/g,
-    confidence: 0.90
+    confidence: 0.90,
+    country: ['US']
   },
   
   // TFN - Australia (Tax File Number)
@@ -217,12 +236,13 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
     country: ['UK']
   },
   
-  // SSN - US (legacy support)
+  // SSN - US
   {
     id: 'ssn-us',
     name: 'SSN_US',
     pattern: /\b\d{3}[ -]?\d{2}[ -]?\d{4}\b/g,
-    confidence: 0.90
+    confidence: 0.90,
+    country: ['US']
   },
   
   // Credit Card (all major cards)
@@ -316,5 +336,70 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
     pattern: /\b\d+\s+[A-Za-z\s]+(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Circuit|Cct)\b/gi,
     confidence: 0.75,
     country: ['AU']
-  }
+  },
+
+  // NZ Address Patterns
+  {
+    id: 'nz-address',
+    name: 'NZ_ADDRESS',
+    pattern: /\b\d+\s+[A-Za-z\s]+(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Terrace|Tce|Crescent|Cres)\b/gi,
+    confidence: 0.75,
+    country: ['NZ']
+  },
+
+  // UK Address Patterns
+  {
+    id: 'uk-address',
+    name: 'UK_ADDRESS',
+    pattern: /\b\d+\s+[A-Za-z\s]+(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Close|Cl|Way|Court|Ct|Gardens|Gdns|Terrace|Tce|Crescent|Cres)\b/gi,
+    confidence: 0.75,
+    country: ['UK']
+  },
+
+  // AU Passport (letter + 7 digits, e.g. N1234567 or PA1234567)
+  {
+    id: 'au-passport',
+    name: 'AU_PASSPORT',
+    pattern: /\b[A-Z]{1,2}\d{7}\b/g,
+    confidence: 0.80,
+    country: ['AU']
+  },
+
+  // NZ Passport (2 letters + 6-7 digits, e.g. LA123456 or LF0123456)
+  {
+    id: 'nz-passport',
+    name: 'NZ_PASSPORT',
+    pattern: /\b[A-Z]{2}\d{6,7}\b/g,
+    confidence: 0.80,
+    country: ['NZ']
+  },
+
+  // NZ NHI (National Health Index) — 3 letters + 4 digits (e.g. ZAC1234)
+  {
+    id: 'nz-nhi',
+    name: 'NZ_NHI',
+    pattern: /\b[A-HJ-NP-Z]{3}\d{4}\b/g,
+    confidence: 0.92,
+    country: ['NZ']
+  },
+
+  // UK NHS Number — 10 digits in 3-3-4 format with modulus 11 check
+  {
+    id: 'uk-nhs',
+    name: 'UK_NHS',
+    pattern: /\b\d{3}[ -]?\d{3}[ -]?\d{4}\b/g,
+    validator: ukNhsCheck,
+    confidence: 0.92,
+    country: ['UK']
+  },
+
+  // NZ Bank Account — BB-bbbb-AAAAAAA-SSS (bank-branch-account-suffix)
+  {
+    id: 'nz-bank-account',
+    name: 'NZ_BANK_ACCOUNT',
+    pattern: /\b\d{2}[ -]?\d{4}[ -]?\d{7}[ -]?\d{2,3}\b/g,
+    confidence: 0.88,
+    country: ['NZ']
+  },
+
 ];
