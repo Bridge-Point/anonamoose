@@ -82,6 +82,7 @@ export class ProxyServer {
         enableNER: s.enableNER ?? true,
         nerModel: s.nerModel ?? 'Xenova/bert-base-NER',
         nerMinConfidence: s.nerMinConfidence ?? 0.6,
+        locale: s.locale ?? null,
         tokenizePlaceholders: s.tokenizePlaceholders ?? true,
         placeholderPrefix: s.placeholderPrefix ?? '\uE000',
         placeholderSuffix: s.placeholderSuffix ?? '\uE001',

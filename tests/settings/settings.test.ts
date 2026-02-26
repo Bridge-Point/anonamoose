@@ -77,13 +77,14 @@ describe('Settings (SQLite)', () => {
 
   it('should return all default settings', () => {
     const settings = getAllSettings(db);
-    expect(Object.keys(settings)).toHaveLength(9);
+    expect(Object.keys(settings)).toHaveLength(10);
     expect(Object.keys(settings)).toContain('enableDictionary');
     expect(Object.keys(settings)).toContain('enableRegex');
     expect(Object.keys(settings)).toContain('enableNames');
     expect(Object.keys(settings)).toContain('enableNER');
     expect(Object.keys(settings)).toContain('nerModel');
     expect(Object.keys(settings)).toContain('nerMinConfidence');
+    expect(Object.keys(settings)).toContain('locale');
     expect(Object.keys(settings)).toContain('tokenizePlaceholders');
     expect(Object.keys(settings)).toContain('placeholderPrefix');
     expect(Object.keys(settings)).toContain('placeholderSuffix');

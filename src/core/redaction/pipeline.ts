@@ -60,7 +60,7 @@ export class RedactionPipeline {
 
     // LAYER 3: Regex (deterministic patterns)
     if (config.enableRegex) {
-      const regexResult = this.redactRegex(result);
+      const regexResult = this.redactRegex(result, config.locale);
       for (const [token, original] of regexResult.tokens) {
         tokens.set(token, original);
       }
@@ -98,11 +98,15 @@ export class RedactionPipeline {
     };
   }
 
-  private redactRegex(text: string): { text: string; tokens: Map<string, string>; detections: PIIDetection[] } {
+  private redactRegex(text: string, locale?: string | null): { text: string; tokens: Map<string, string>; detections: PIIDetection[] } {
     const tokens = new Map<string, string>();
     const detections: PIIDetection[] = [];
 
-    for (const pattern of DEFAULT_PATTERNS) {
+    const patterns = locale
+      ? DEFAULT_PATTERNS.filter(p => !p.country || p.country.includes(locale))
+      : DEFAULT_PATTERNS;
+
+    for (const pattern of patterns) {
       const matches = [...text.matchAll(pattern.pattern)];
 
       for (const match of matches) {

@@ -52,6 +52,7 @@ interface SettingsData {
   enableNER: boolean;
   nerModel: string;
   nerMinConfidence: number;
+  locale: string | null;
   tokenizePlaceholders: boolean;
   placeholderPrefix: string;
   placeholderSuffix: string;
@@ -1147,6 +1148,28 @@ export default function AdminPanel() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Locale</h3>
+                    <div className="p-3 bg-gray-50 rounded">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Regex Pattern Region</label>
+                      <select
+                        value={settings.locale || ''}
+                        onChange={(e) => updateSetting('locale', e.target.value || null)}
+                        className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      >
+                        <option value="">All regions (no filtering)</option>
+                        <option value="AU">Australia</option>
+                        <option value="NZ">New Zealand</option>
+                        <option value="UK">United Kingdom</option>
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {settings.locale
+                          ? `Only universal patterns and ${settings.locale}-specific patterns will run. Reduces false positives from other regions.`
+                          : 'All regex patterns run regardless of region (AU, NZ, UK, US). May produce false positives from other regions.'}
+                      </p>
                     </div>
                   </div>
 

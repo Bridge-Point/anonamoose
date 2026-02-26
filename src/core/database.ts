@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS: Record<string, any> = {
   enableNER: true,
   nerModel: 'Xenova/bert-base-NER',
   nerMinConfidence: 0.6,
+  locale: null,
   tokenizePlaceholders: true,
   placeholderPrefix: '\uE000',
   placeholderSuffix: '\uE001',

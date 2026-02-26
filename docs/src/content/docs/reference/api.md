@@ -294,6 +294,7 @@ Get all current settings.
     "enableNER": true,
     "nerModel": "Xenova/bert-base-NER",
     "nerMinConfidence": 0.6,
+    "locale": null,
     "tokenizePlaceholders": true,
     "placeholderPrefix": "\ue000",
     "placeholderSuffix": "\ue001"

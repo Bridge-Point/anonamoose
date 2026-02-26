@@ -21,6 +21,7 @@ export interface RedactionConfig {
   enableNER: boolean;
   nerModel: string;
   nerMinConfidence: number;
+  locale: string | null;
   tokenizePlaceholders: boolean;
   placeholderPrefix: string;
   placeholderSuffix: string;

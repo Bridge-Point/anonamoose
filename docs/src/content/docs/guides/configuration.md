@@ -29,6 +29,7 @@ Pipeline settings are stored in the SQLite database and can be changed at runtim
 | `enableNames` | `true` | Enable name-list detection |
 | `nerModel` | `Xenova/bert-base-NER` | HuggingFace model ID for NER |
 | `nerMinConfidence` | `0.6` | Minimum NER confidence threshold |
+| `locale` | `null` | Regex pattern region filter (`AU`, `NZ`, `UK`, or `null` for all) |
 | `tokenizePlaceholders` | `true` | Use PUA token placeholders instead of descriptive labels |
 | `placeholderPrefix` | `\uE000` | Unicode PUA prefix for tokens |
 | `placeholderSuffix` | `\uE001` | Unicode PUA suffix for tokens |
