@@ -6,6 +6,9 @@ dist/
 *.log
 .DS_Store
 
+# Data
+data/
+
 # Build artifacts
 ui/.next/
 docs/node_modules/

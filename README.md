@@ -33,7 +33,7 @@ Create a `.env` file:
 ```bash
 OPENAI_API_KEY=sk-...             # Optional
 ANTHROPIC_API_KEY=sk-ant-...      # Optional
-REDIS_URL=redis://localhost:6379  # Optional, defaults to in-memory
+ANONAMOOSE_DB_PATH=./data/anonamoose.db  # Optional, defaults to ./data/anonamoose.db
 API_TOKEN=your-api-token          # Optional, protects management endpoints
 STATS_TOKEN=your-stats-token      # Required for /api/v1/stats
 ```
@@ -54,7 +54,7 @@ cd docker
 docker-compose up -d
 ```
 
-This starts Anonamoose, Redis, and the Stats Dashboard.
+This starts Anonamoose and the Stats Dashboard.
 
 ## How It Works
 
@@ -86,14 +86,14 @@ App → Anonamoose Proxy → LLM API
 | `MGMT_PORT` | `3001` | Management API port |
 | `OPENAI_API_KEY` | — | OpenAI API key for proxy passthrough |
 | `ANTHROPIC_API_KEY` | — | Anthropic API key for proxy passthrough |
-| `REDIS_URL` | — | Redis connection URL (in-memory if not set) |
+| `ANONAMOOSE_DB_PATH` | `./data/anonamoose.db` | SQLite database path |
 | `API_TOKEN` | — | Bearer token for management API |
 | `STATS_TOKEN` | — | Bearer token for stats endpoint |
 | `NER_MODEL_CACHE` | — | Custom cache directory for the NER model |
 
 ## Testing
 
-159 tests across 7 suites — **99.5% statement coverage**.
+167 tests across 8 suites — **99.5% statement coverage**.
 
 ```bash
 npm test                # run all tests
@@ -115,7 +115,8 @@ Test suites cover:
 - **Tokenizer** — Unicode PUA token generation, uniqueness, replacement
 - **NER** — transformer entity detection (PERSON, ORG, LOCATION), BIO tag merging, WordPiece subwords, confidence filtering, circuit breaker
 - **Pipeline** — full three-layer integration with synthetic PII scenarios
-- **Rehydration store** — in-memory and Redis (mocked) session storage, TTL, cleanup, eviction
+- **Rehydration store** — SQLite session storage, TTL, cleanup
+- **Settings** — SQLite-backed runtime settings CRUD, defaults, persistence
 
 ## Documentation
 

@@ -9,7 +9,6 @@ Get Anonamoose running locally and make your first redacted request.
 
 - Node.js 20+
 - npm or yarn
-- (Optional) Redis for persistent session storage
 - (Optional) Docker & Docker Compose
 
 ## Install
@@ -25,18 +24,12 @@ npm install
 Create a `.env` file in the project root:
 
 ```bash
-# Required for stats dashboard
-STATS_TOKEN=your-secure-token
+# Protects the management API and admin panel
+API_TOKEN=your-api-token
 
 # Optional — provide if proxying to LLM APIs
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
-
-# Optional — defaults to in-memory storage
-REDIS_URL=redis://localhost:6379
-
-# Optional — protects management endpoints
-API_TOKEN=your-api-token
 ```
 
 ## Run

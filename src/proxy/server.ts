@@ -1,4 +1,6 @@
 import { timingSafeEqual } from 'crypto';
+import path from 'path';
+import fs from 'fs';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,8 +9,9 @@ import { v4 as uuidv4 } from 'uuid';
 import type { ProxyConfig, ChatMessage, RedactionConfig } from '../core/types.js';
 import { RedactionPipeline } from '../core/redaction/pipeline.js';
 import { DictionaryService } from '../core/redaction/dictionary.js';
-import { DEFAULT_REDACTION_CONFIG } from '../core/types.js';
+import { NERLayer } from '../core/redaction/ner-layer.js';
 import { RehydrationStore } from '../core/rehydration/store.js';
+import { getDatabase, getAllSettings, getSetting, setSetting, closeDatabase, type SqliteDatabase } from '../core/database.js';
 
 // Max age for in-memory sessionTokens entries (1 hour)
 const SESSION_TOKEN_TTL_MS = 60 * 60 * 1000;
@@ -29,34 +32,61 @@ interface RequestLogEntry {
   sessionId?: string;
 }
 
+interface RedactionLogEntry {
+  timestamp: string;
+  source: 'api' | 'openai' | 'anthropic';
+  sessionId: string;
+  inputPreview: string;
+  redactedPreview: string;
+  detections: { type: string; category: string; confidence: number }[];
+}
+
 const MAX_LOG_ENTRIES = 500;
+const MAX_REDACTION_LOG = 100;
+const REDACTION_LOG_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 export class ProxyServer {
   private app: express.Application;
+  private db: SqliteDatabase;
   private redactionPipeline: RedactionPipeline;
   private rehydrationStore: RehydrationStore;
   private sessionTokens: Map<string, SessionTokenEntry> = new Map();
   private sessionCleanupTimer: ReturnType<typeof setInterval>;
   private requestLog: RequestLogEntry[] = [];
+  private redactionLog: RedactionLogEntry[] = [];
   private stats = {
     requestsRedacted: 0,
     requestsHydrated: 0,
     piiDetected: 0,
     dictionaryHits: 0,
     regexHits: 0,
+    namesHits: 0,
     nerHits: 0
   };
 
-  constructor(
-    private config: ProxyConfig,
-    redactionConfig: RedactionConfig = DEFAULT_REDACTION_CONFIG
-  ) {
+  constructor(private config: ProxyConfig) {
     this.app = express();
     this.app.set('trust proxy', 1);
-    this.rehydrationStore = new RehydrationStore(config.redisUrl);
 
-    const dictionary = new DictionaryService();
-    this.redactionPipeline = new RedactionPipeline(dictionary, redactionConfig);
+    this.db = getDatabase(config.dbPath);
+    this.rehydrationStore = new RehydrationStore(this.db);
+
+    const dictionary = new DictionaryService(this.db);
+    const db = this.db;
+    this.redactionPipeline = new RedactionPipeline(dictionary, (): RedactionConfig => {
+      const s = getAllSettings(db);
+      return {
+        enableDictionary: s.enableDictionary ?? true,
+        enableRegex: s.enableRegex ?? true,
+        enableNames: s.enableNames ?? true,
+        enableNER: s.enableNER ?? true,
+        nerModel: s.nerModel ?? 'Xenova/bert-base-NER',
+        nerMinConfidence: s.nerMinConfidence ?? 0.6,
+        tokenizePlaceholders: s.tokenizePlaceholders ?? true,
+        placeholderPrefix: s.placeholderPrefix ?? '\uE000',
+        placeholderSuffix: s.placeholderSuffix ?? '\uE001',
+      };
+    });
 
     this.setupMiddleware();
     this.setupRoutes();
@@ -73,26 +103,56 @@ export class ProxyServer {
     }
   }
 
+  private addRedactionLogEntry(
+    source: RedactionLogEntry['source'],
+    sessionId: string,
+    inputText: string,
+    redactedText: string,
+    detectedPII: { type: string; category: string; confidence: number }[]
+  ): void {
+    // Expire old entries
+    const cutoff = Date.now() - REDACTION_LOG_TTL_MS;
+    this.redactionLog = this.redactionLog.filter(e => new Date(e.timestamp).getTime() > cutoff);
+
+    this.redactionLog.push({
+      timestamp: new Date().toISOString(),
+      source,
+      sessionId,
+      inputPreview: inputText.length > 500 ? inputText.slice(0, 500) + '...' : inputText,
+      redactedPreview: redactedText.length > 500 ? redactedText.slice(0, 500) + '...' : redactedText,
+      detections: detectedPII,
+    });
+
+    if (this.redactionLog.length > MAX_REDACTION_LOG) {
+      this.redactionLog.splice(0, this.redactionLog.length - MAX_REDACTION_LOG);
+    }
+  }
+
   private setupMiddleware(): void {
     this.app.use((req: Request, res: Response, next: NextFunction) => {
       const start = Date.now();
       console.log(`${req.method} ${req.path} [${req.ip}]`);
       const originalEnd = res.end.bind(res);
       res.end = ((...args: any[]) => {
-        this.addLogEntry({
-          timestamp: new Date().toISOString(),
-          method: req.method,
-          path: req.path,
-          status: res.statusCode,
-          ip: req.ip || 'unknown',
-          duration: Date.now() - start,
-          sessionId: req.headers['x-anonamoose-session'] as string,
-        });
+        const mgmtPrefixes = ['/api/v1/logs', '/api/v1/sessions', '/api/v1/redactions', '/api/v1/stats', '/api/v1/settings', '/logs', '/sessions', '/redactions', '/stats', '/settings', '/health', '/_next/', '/favicon'];
+        if (!mgmtPrefixes.some(p => req.path.startsWith(p))) {
+          this.addLogEntry({
+            timestamp: new Date().toISOString(),
+            method: req.method,
+            path: req.path,
+            status: res.statusCode,
+            ip: req.ip || 'unknown',
+            duration: Date.now() - start,
+            sessionId: req.headers['x-anonamoose-session'] as string,
+          });
+        }
         return originalEnd(...args);
       }) as any;
       next();
     });
-    this.app.use(helmet());
+    this.app.use(helmet({
+      contentSecurityPolicy: false,
+    }));
     this.app.use(cors({
       origin: process.env.CORS_ORIGIN || false,
     }));
@@ -211,10 +271,52 @@ export class ProxyServer {
     });
 
     this.setupManagementAPI();
+    this.setupStaticUI();
+  }
+
+  private setupStaticUI(): void {
+    const uiPath = path.resolve(process.cwd(), 'ui', 'out');
+    if (!fs.existsSync(uiPath)) return;
+
+    this.app.use(express.static(uiPath));
+
+    // Serve HTML pages for UI routes
+    this.app.get('*', (req: Request, res: Response) => {
+      // Don't serve HTML for API/proxy routes
+      if (req.path.startsWith('/api/') || req.path.startsWith('/v1/') ||
+          req.path === '/health' || req.path === '/chat/completions' ||
+          req.path === '/messages' || req.path === '/models' ||
+          req.path === '/embeddings') {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+
+      const htmlPath = path.join(uiPath, req.path + '.html');
+      const indexPath = path.join(uiPath, req.path, 'index.html');
+
+      if (fs.existsSync(htmlPath)) {
+        res.sendFile(htmlPath);
+      } else if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.sendFile(path.join(uiPath, 'index.html'));
+      }
+    });
   }
 
   private setupManagementAPI(): void {
     const api = express.Router();
+
+    // Public routes — no auth required
+    api.post('/admin/verify', (req: Request, res: Response) => {
+      const { token } = req.body;
+      const apiToken = process.env.API_TOKEN;
+      if (!apiToken || !token || !this.safeCompare(token, apiToken)) {
+        res.status(401).json({ error: 'Invalid token' });
+        return;
+      }
+      res.json({ ok: true });
+    });
 
     // Protected routes — require API_TOKEN or STATS_TOKEN
     api.use((req: Request, res: Response, next: NextFunction) => {
@@ -229,9 +331,87 @@ export class ProxyServer {
       next();
     });
 
+    // Settings endpoints
+    api.get('/settings', (req: Request, res: Response) => {
+      try {
+        const settings = getAllSettings(this.db);
+        res.json({ settings });
+      } catch (err: any) {
+        console.error('Settings error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    api.get('/settings/:key', (req: Request, res: Response) => {
+      try {
+        const { key } = req.params;
+        const value = getSetting(this.db, key);
+        if (value === undefined) {
+          res.status(404).json({ error: `Setting "${key}" not found` });
+          return;
+        }
+        res.json({ key, value });
+      } catch (err: any) {
+        console.error('Settings error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    api.put('/settings', (req: Request, res: Response) => {
+      try {
+        const { settings } = req.body;
+        if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+          res.status(400).json({ error: 'settings must be a non-null object' });
+          return;
+        }
+
+        const oldModel = getSetting<string>(this.db, 'nerModel');
+
+        for (const [key, value] of Object.entries(settings)) {
+          setSetting(this.db, key, value);
+        }
+
+        // Reset NER pipeline if model changed
+        if ('nerModel' in settings && settings.nerModel !== oldModel) {
+          NERLayer.resetPipeline();
+        }
+
+        const updated = getAllSettings(this.db);
+        res.json({ success: true, settings: updated });
+      } catch (err: any) {
+        console.error('Settings error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
     api.get('/dictionary', (req: Request, res: Response) => {
-      const dictionary = (this.redactionPipeline as any).getDictionary();
-      res.json({ entries: dictionary.list() });
+      const dictionary = (this.redactionPipeline as any).getDictionary() as DictionaryService;
+      let entries = dictionary.list();
+      const total = entries.length;
+
+      // Search filter
+      const q = req.query.q as string;
+      if (q) {
+        const lower = q.toLowerCase();
+        entries = entries.filter(e => e.term.toLowerCase().includes(lower));
+      }
+
+      const filtered = entries.length;
+
+      // Pagination
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+      const start = (page - 1) * limit;
+      const paged = entries.slice(start, start + limit);
+
+      res.json({
+        entries: paged,
+        total,
+        filtered,
+        page,
+        limit,
+        pages: Math.ceil(filtered / limit),
+      });
     });
 
     api.post('/dictionary', (req: Request, res: Response) => {
@@ -256,9 +436,19 @@ export class ProxyServer {
         }
       }
 
+      const dictionary = (this.redactionPipeline as any).getDictionary() as DictionaryService;
+
+      // Deduplicate: reject terms that already exist
+      const dupes = entries.filter((e: any) => dictionary.hasTerm(e.term.trim()));
+      if (dupes.length > 0) {
+        const dupeTerms = dupes.map((e: any) => e.term.trim());
+        res.status(409).json({ error: `Term${dupes.length > 1 ? 's' : ''} already exist${dupes.length === 1 ? 's' : ''}: ${dupeTerms.join(', ')}` });
+        return;
+      }
+
       const formatted = entries.map((e: any) => ({
         id: e.id || uuidv4(),
-        term: e.term,
+        term: e.term.trim(),
         replacement: e.replacement,
         caseSensitive: e.caseSensitive ?? false,
         wholeWord: e.wholeWord ?? false,
@@ -266,7 +456,7 @@ export class ProxyServer {
         createdAt: new Date()
       }));
 
-      (this.redactionPipeline as any).getDictionary().add(formatted);
+      dictionary.add(formatted);
       res.json({ success: true, count: formatted.length });
     });
 
@@ -279,6 +469,13 @@ export class ProxyServer {
 
       (this.redactionPipeline as any).getDictionary().remove(ids);
       res.json({ success: true });
+    });
+
+    api.post('/dictionary/flush', async (_req: Request, res: Response) => {
+      const dictionary = (this.redactionPipeline as any).getDictionary() as DictionaryService;
+      const count = dictionary.size();
+      await dictionary.clear();
+      res.json({ success: true, cleared: count });
     });
 
     api.post('/sessions/:id/hydrate', async (req: Request, res: Response) => {
@@ -315,7 +512,7 @@ export class ProxyServer {
         res.json({
           ...this.stats,
           activeSessions,
-          redisConnected: storeStats.redisConnected,
+          storageConnected: storeStats.storageConnected,
           dictionarySize: ((this.redactionPipeline as any).getDictionary() as DictionaryService).size(),
           storage: storageStats
         });
@@ -463,8 +660,8 @@ export class ProxyServer {
           return;
         }
 
-        if (type && !['dictionary', 'regex', 'ner'].includes(type)) {
-          res.status(400).json({ error: 'type must be "dictionary", "regex", or "ner"' });
+        if (type && !['dictionary', 'regex', 'names', 'ner'].includes(type)) {
+          res.status(400).json({ error: 'type must be "dictionary", "regex", "names", or "ner"' });
           return;
         }
 
@@ -518,6 +715,19 @@ export class ProxyServer {
       res.json({ success: true });
     });
 
+    // Recent redactions log
+    api.get('/redactions', (_req: Request, res: Response) => {
+      // Expire entries older than 15 minutes
+      const cutoff = Date.now() - REDACTION_LOG_TTL_MS;
+      this.redactionLog = this.redactionLog.filter(e => new Date(e.timestamp).getTime() > cutoff);
+      res.json({ redactions: [...this.redactionLog].reverse(), total: this.redactionLog.length });
+    });
+
+    api.delete('/redactions', (_req: Request, res: Response) => {
+      this.redactionLog = [];
+      res.json({ success: true });
+    });
+
     // Flush all sessions (cache)
     api.post('/sessions/flush', async (_req: Request, res: Response) => {
       try {
@@ -529,14 +739,16 @@ export class ProxyServer {
       }
     });
 
-    // Public stats endpoint (limited info)
+    // Public stats endpoint (used by dashboard)
     api.get('/stats/public', async (req: Request, res: Response) => {
       try {
+        const activeSessions = await this.rehydrationStore.size();
         const storeStats = await this.rehydrationStore.getStats();
         res.json({
-          activeSessions: storeStats.activeSessions,
-          redisConnected: storeStats.redisConnected,
-          dictionarySize: ((this.redactionPipeline as any).getDictionary() as DictionaryService).size()
+          ...this.stats,
+          activeSessions,
+          storageConnected: storeStats.storageConnected,
+          dictionarySize: ((this.redactionPipeline as any).getDictionary() as DictionaryService).size(),
         });
       } catch (err: any) {
         console.error('API error:', err);
@@ -599,7 +811,7 @@ export class ProxyServer {
 
     // Store each type separately for proper deduplication
     for (const [type, tokens] of tokensByType) {
-      await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'ner', 'PII');
+      await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'names' | 'ner', 'PII');
     }
 
     this.stats.requestsRedacted++;
@@ -608,8 +820,13 @@ export class ProxyServer {
     for (const pii of result.detectedPII) {
       if (pii.type === 'dictionary') this.stats.dictionaryHits++;
       else if (pii.type === 'regex') this.stats.regexHits++;
+      else if (pii.type === 'names') this.stats.namesHits++;
       else if (pii.type === 'ner') this.stats.nerHits++;
     }
+
+    this.addRedactionLogEntry('api', sessionId, text, result.redactedText,
+      result.detectedPII.map(d => ({ type: d.type, category: d.category, confidence: d.confidence }))
+    );
 
     res.json({
       redactedText: result.redactedText,
@@ -694,14 +911,20 @@ export class ProxyServer {
           tokensByType.get(type)!.set(token, original);
         }
         for (const [type, tokens] of tokensByType) {
-          await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'ner', 'SYSTEM');
+          await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'names' | 'ner', 'SYSTEM');
         }
         requestBody.system = systemResult.redactedText;
         this.stats.requestsRedacted++;
+
+        if (systemResult.detectedPII.length > 0) {
+          this.addRedactionLogEntry('anthropic', sessionId, req.body.system, systemResult.redactedText,
+            systemResult.detectedPII.map(d => ({ type: d.type, category: d.category, confidence: d.confidence }))
+          );
+        }
       }
 
       if (requestBody.messages) {
-        requestBody.messages = await this.redactMessages(requestBody.messages, sessionId);
+        requestBody.messages = await this.redactMessages(requestBody.messages, sessionId, 'anthropic');
       }
     }
 
@@ -729,7 +952,7 @@ export class ProxyServer {
     }
   }
 
-  private async redactMessages(messages: ChatMessage[], sessionId: string): Promise<ChatMessage[]> {
+  private async redactMessages(messages: ChatMessage[], sessionId: string, source: RedactionLogEntry['source'] = 'openai'): Promise<ChatMessage[]> {
     const result: ChatMessage[] = [];
 
     for (const msg of messages) {
@@ -746,14 +969,21 @@ export class ProxyServer {
           tokensByType.get(type)!.set(token, original);
         }
         for (const [type, tokens] of tokensByType) {
-          await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'ner', 'MESSAGE');
+          await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'names' | 'ner', 'MESSAGE');
         }
 
         this.stats.piiDetected += redactionResult.detectedPII.length;
         for (const pii of redactionResult.detectedPII) {
           if (pii.type === 'dictionary') this.stats.dictionaryHits++;
           else if (pii.type === 'regex') this.stats.regexHits++;
+          else if (pii.type === 'names') this.stats.namesHits++;
           else if (pii.type === 'ner') this.stats.nerHits++;
+        }
+
+        if (redactionResult.detectedPII.length > 0) {
+          this.addRedactionLogEntry(source, sessionId, msg.content, redactionResult.redactedText,
+            redactionResult.detectedPII.map(d => ({ type: d.type, category: d.category, confidence: d.confidence }))
+          );
         }
 
         result.push({ ...msg, content: redactionResult.redactedText });
@@ -772,14 +1002,21 @@ export class ProxyServer {
               tokensByType.get(type)!.set(token, original);
             }
             for (const [type, tokens] of tokensByType) {
-              await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'ner', 'MESSAGE');
+              await this.rehydrationStore.store(sessionId, tokens, 3600, type as 'dictionary' | 'regex' | 'names' | 'ner', 'MESSAGE');
             }
 
             this.stats.piiDetected += blockResult.detectedPII.length;
             for (const pii of blockResult.detectedPII) {
               if (pii.type === 'dictionary') this.stats.dictionaryHits++;
               else if (pii.type === 'regex') this.stats.regexHits++;
+              else if (pii.type === 'names') this.stats.namesHits++;
               else if (pii.type === 'ner') this.stats.nerHits++;
+            }
+
+            if (blockResult.detectedPII.length > 0) {
+              this.addRedactionLogEntry(source, sessionId, block.text, blockResult.redactedText,
+                blockResult.detectedPII.map(d => ({ type: d.type, category: d.category, confidence: d.confidence }))
+              );
             }
 
             redactedBlocks.push({ ...block, text: blockResult.redactedText });
@@ -1001,5 +1238,7 @@ export class ProxyServer {
 
   destroy(): void {
     clearInterval(this.sessionCleanupTimer);
+    this.rehydrationStore.destroy();
+    closeDatabase();
   }
 }

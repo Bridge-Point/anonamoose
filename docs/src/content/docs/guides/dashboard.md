@@ -1,29 +1,92 @@
 ---
-title: Stats Dashboard
-description: Monitor redaction activity with the built-in dashboard.
+title: Dashboard & Admin Panel
+description: Monitor redaction activity and manage your Anonamoose instance.
 ---
 
-Anonamoose includes a stats dashboard built with Next.js and shadcn UI components. It provides real-time visibility into redaction activity.
+Anonamoose includes a Next.js dashboard and admin panel for monitoring and management.
 
-## Accessing the dashboard
+## Dashboard
 
-When running with Docker Compose, the dashboard is available at **http://localhost:3102**.
+The public dashboard shows real-time stats without authentication:
 
-The dashboard requires a `STATS_TOKEN` to be configured. Set this in your `.env` file:
+- Requests redacted / hydrated
+- PII detected (total and by layer)
+- Active sessions
+- Dictionary size
+- System status (API, database, NER)
+
+When running with Docker Compose, the dashboard is available at port **3002**.
+
+## Admin panel
+
+The admin panel is at `/admin` and requires `API_TOKEN` authentication. It provides five tabs:
+
+### Request Logs
+
+Live request log showing every request through the proxy (auto-refreshes every 5 seconds):
+
+- Method, path, status code, duration, client IP
+- Admin/management API calls are excluded from the log
+- Clear all logs with one click
+
+### Sessions & Cache
+
+Browse and manage active rehydration sessions:
+
+- Search sessions by ID or token placeholder
+- View token mappings for each session (placeholder, type, category)
+- Delete individual sessions
+- Flush all sessions
+
+### Redaction Inspector
+
+Test and verify redaction in real time:
+
+- Enter text and run it through the pipeline
+- View the redacted output with token placeholders
+- See each detection: original text, category, layer, confidence score, position
+- **Recent Redactions** (last 15 minutes) — browse redactions from live proxy traffic with expandable details showing input, output, and detections
+
+### Dictionary
+
+Manage guaranteed redaction terms:
+
+- Add new terms with one click
+- Search and browse existing terms
+- Remove individual terms
+- Clear all terms
+- Pagination for large dictionaries
+
+### Settings
+
+Configure the redaction pipeline at runtime:
+
+- Toggle layers on/off (Dictionary, Local AI, Regex, Name Detection)
+- Change the NER model (HuggingFace model ID)
+- Adjust NER confidence threshold
+- Configure tokenization (placeholders, prefix, suffix)
+
+Settings persist across restarts in the SQLite database.
+
+## Authentication
+
+Set `API_TOKEN` in your environment to protect the admin panel:
 
 ```bash
-STATS_TOKEN=your-secure-stats-token
+API_TOKEN=your-secure-token
 ```
+
+The admin panel prompts for this token on first visit. The token is stored in the browser's session storage and cleared when the tab closes.
 
 ## Stats API
 
-### Protected stats
+### Full stats
 
-Full stats including hit counts by detection type:
+Requires `API_TOKEN` or `STATS_TOKEN`:
 
 ```bash
-curl http://localhost:3001/api/v1/stats \
-  -H "Authorization: Bearer your-stats-token"
+curl http://localhost:3000/api/v1/stats \
+  -H "Authorization: Bearer your-token"
 ```
 
 Response:
@@ -34,43 +97,21 @@ Response:
   "requestsHydrated": 98,
   "piiDetected": 367,
   "dictionaryHits": 45,
-  "regexHits": 289,
-  "nerHits": 33,
+  "regexHits": 189,
+  "namesHits": 23,
+  "nerHits": 110,
   "activeSessions": 12,
-  "redisConnected": true,
-  "dictionarySize": 8,
-  "storage": {
-    "sessionCount": 12,
-    "totalTokens": 367,
-    "redisConnected": true,
-    "memoryUsage": "1.24M"
-  }
+  "storageConnected": true,
+  "dictionarySize": 8
 }
 ```
 
 ### Public stats
 
-A limited stats endpoint is available without authentication:
+Available without authentication:
 
 ```bash
-curl http://localhost:3001/api/v1/stats/public
+curl http://localhost:3000/api/v1/stats/public
 ```
 
-Returns only:
-
-```json
-{
-  "activeSessions": 12,
-  "redisConnected": true,
-  "dictionarySize": 8
-}
-```
-
-### Storage stats
-
-```bash
-curl http://localhost:3001/api/v1/storage \
-  -H "Authorization: Bearer your-api-token"
-```
-
-Returns session count, total tokens, Redis connection status, and memory usage.
+Returns a limited subset: active sessions, storage status, dictionary size, and basic hit counts.

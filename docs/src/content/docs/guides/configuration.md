@@ -1,9 +1,9 @@
 ---
 title: Configuration
-description: Configure Anonamoose via environment variables.
+description: Configure Anonamoose via environment variables and runtime settings.
 ---
 
-Anonamoose is configured entirely through environment variables. Set them in a `.env` file or pass them directly.
+Anonamoose is configured through environment variables (for server setup) and runtime settings (for redaction behavior).
 
 ## Environment variables
 
@@ -13,44 +13,47 @@ Anonamoose is configured entirely through environment variables. Set them in a `
 | `MGMT_PORT` | `3001` | Management API port |
 | `OPENAI_API_KEY` | — | OpenAI API key for proxy passthrough |
 | `ANTHROPIC_API_KEY` | — | Anthropic API key for proxy passthrough |
-| `REDIS_URL` | — | Redis connection URL (e.g. `redis://localhost:6379`). Falls back to in-memory storage if not set. |
-| `API_TOKEN` | — | Bearer token for management API auth. If unset, management endpoints are unauthenticated. |
-| `STATS_TOKEN` | — | Bearer token for the stats endpoint. Required to access protected stats. |
+| `ANONAMOOSE_DB_PATH` | `./data/anonamoose.db` | SQLite database path. Sessions and settings are stored here. |
+| `API_TOKEN` | — | Bearer token for management API and admin panel authentication. If unset, management endpoints are unauthenticated. |
+| `STATS_TOKEN` | — | Alternative bearer token accepted for stats endpoints only. |
 
-## Redaction pipeline defaults
+## Redaction pipeline settings
 
-The redaction pipeline is configured in code via `RedactionConfig`:
+Pipeline settings are stored in the SQLite database and can be changed at runtime via the [Settings API](/reference/api/#settings) or the [Admin Panel](/guides/dashboard/#settings). Defaults are seeded on first boot:
 
-| Option | Default | Description |
-|--------|---------|-------------|
+| Setting | Default | Description |
+|---------|---------|-------------|
 | `enableDictionary` | `true` | Enable dictionary-based guaranteed redaction |
+| `enableNER` | `true` | Enable transformer NER detection (Local AI) |
 | `enableRegex` | `true` | Enable regex pattern detection |
-| `enableNER` | `false` | Enable NER (compromise.js) detection. Disabled by default for performance. |
+| `enableNames` | `true` | Enable name-list detection |
+| `nerModel` | `Xenova/bert-base-NER` | HuggingFace model ID for NER |
+| `nerMinConfidence` | `0.6` | Minimum NER confidence threshold |
 | `tokenizePlaceholders` | `true` | Use PUA token placeholders instead of descriptive labels |
+| `placeholderPrefix` | `\uE000` | Unicode PUA prefix for tokens |
+| `placeholderSuffix` | `\uE001` | Unicode PUA suffix for tokens |
+
+Settings persist across restarts and can be modified without redeploying.
 
 ## Storage
 
-By default, sessions are stored **in-memory** and are lost on restart. For persistent storage, provide a `REDIS_URL`:
-
-```bash
-REDIS_URL=redis://localhost:6379
-```
+Sessions are stored in **SQLite** and persist across restarts. The database is created automatically at the configured path (default `./data/anonamoose.db`).
 
 Sessions have a default TTL of 1 hour (3600 seconds). You can extend individual sessions via the API.
 
 ## Authentication
 
-### Management API (`API_TOKEN`)
+### Management API & Admin Panel (`API_TOKEN`)
 
-When `API_TOKEN` is set, all `/api/v1/*` endpoints require a Bearer token:
+When `API_TOKEN` is set, all `/api/v1/*` endpoints (except public stats) and the admin panel require authentication:
 
 ```bash
 curl -H "Authorization: Bearer your-api-token" \
-  http://localhost:3001/api/v1/dictionary
+  http://localhost:3000/api/v1/dictionary
 ```
 
 When `API_TOKEN` is not set, management endpoints are open (suitable for development).
 
 ### Stats (`STATS_TOKEN`)
 
-The `STATS_TOKEN` protects the `/api/v1/stats` endpoint and the dashboard UI. It must be explicitly configured — stats are not accessible without it.
+The `STATS_TOKEN` is an alternative token accepted specifically for the stats endpoint. This is useful when you want to give the dashboard access to stats without sharing the full management `API_TOKEN`.

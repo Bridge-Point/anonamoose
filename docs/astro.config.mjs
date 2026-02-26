@@ -31,7 +31,7 @@ export default defineConfig({
             { label: 'Proxy Usage', slug: 'guides/proxy' },
             { label: 'Sessions', slug: 'guides/sessions' },
             { label: 'Deployment', slug: 'guides/deployment' },
-            { label: 'Dashboard', slug: 'guides/dashboard' },
+            { label: 'Dashboard & Admin', slug: 'guides/dashboard' },
           ],
         },
         {
@@ -47,7 +47,7 @@ export default defineConfig({
           label: 'Concepts',
           items: [
             { label: 'How It Works', slug: 'concepts/how-it-works' },
-            { label: 'Three-Layer Pipeline', slug: 'concepts/three-layer-pipeline' },
+            { label: 'Four-Layer Pipeline', slug: 'concepts/three-layer-pipeline' },
             { label: 'Tokenization', slug: 'concepts/tokenization' },
             { label: 'Presidio Comparison', slug: 'concepts/presidio-comparison' },
           ],

@@ -2,15 +2,27 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { RedactionPipeline } from '../../src/core/redaction/pipeline.js';
 import { DictionaryService } from '../../src/core/redaction/dictionary.js';
 import { NERLayer } from '../../src/core/redaction/ner-layer.js';
-import { DEFAULT_REDACTION_CONFIG } from '../../src/core/types.js';
+import type { RedactionConfig } from '../../src/core/types.js';
 
 afterAll(() => {
   NERLayer.resetPipeline();
 });
 
+const DEFAULT_CONFIG: RedactionConfig = {
+  enableDictionary: true,
+  enableRegex: true,
+  enableNames: true,
+  enableNER: true,
+  nerModel: 'Xenova/bert-base-NER',
+  nerMinConfidence: 0.6,
+  tokenizePlaceholders: true,
+  placeholderPrefix: '\uE000',
+  placeholderSuffix: '\uE001',
+};
+
 // Helper to create a pipeline with optional dictionary entries
 const createPipeline = async (
-  config: Partial<typeof DEFAULT_REDACTION_CONFIG> = {},
+  config: Partial<RedactionConfig> = {},
   dictTerms: string[] = []
 ) => {
   const dictionary = new DictionaryService();
@@ -24,7 +36,8 @@ const createPipeline = async (
       createdAt: new Date(),
     })));
   }
-  return new RedactionPipeline(dictionary, { ...DEFAULT_REDACTION_CONFIG, ...config });
+  const fullConfig = { ...DEFAULT_CONFIG, ...config };
+  return new RedactionPipeline(dictionary, () => fullConfig);
 };
 
 describe('Redaction Pipeline', () => {
@@ -104,7 +117,7 @@ describe('Redaction Pipeline', () => {
   describe('NER Layer (Probabilistic)', () => {
     it('should redact person names', async () => {
       const pipeline = await createPipeline({
-        enableDictionary: false, enableRegex: false, enableNER: true,
+        enableDictionary: false, enableRegex: false, enableNames: false, enableNER: true,
       });
       const result = await pipeline.redact('My name is Sarah Johnson', 'sess-8');
       expect(result.redactedText).not.toContain('Sarah Johnson');
@@ -114,7 +127,7 @@ describe('Redaction Pipeline', () => {
 
     it('should redact organizations', async () => {
       const pipeline = await createPipeline({
-        enableDictionary: false, enableRegex: false, enableNER: true,
+        enableDictionary: false, enableRegex: false, enableNames: false, enableNER: true,
       });
       const result = await pipeline.redact('She works at Microsoft', 'sess-9');
       expect(result.redactedText).not.toContain('Microsoft');
@@ -122,11 +135,44 @@ describe('Redaction Pipeline', () => {
 
     it('should redact locations', async () => {
       const pipeline = await createPipeline({
-        enableDictionary: false, enableRegex: false, enableNER: true,
+        enableDictionary: false, enableRegex: false, enableNames: false, enableNER: true,
       });
       const result = await pipeline.redact('He lives in London', 'sess-10');
       expect(result.redactedText).not.toContain('London');
     }, 30000);
+  });
+
+  describe('Names Layer', () => {
+    it('should detect names when enabled', async () => {
+      const pipeline = await createPipeline({
+        enableDictionary: false, enableRegex: false, enableNames: true, enableNER: false,
+      });
+      const result = await pipeline.redact('I spoke with Jessica yesterday', 'sess-names-1');
+      expect(result.redactedText).not.toContain('Jessica');
+      expect(result.detectedPII.some(d => d.type === 'names')).toBe(true);
+    });
+
+    it('should not detect names when disabled', async () => {
+      const pipeline = await createPipeline({
+        enableDictionary: false, enableRegex: false, enableNames: false, enableNER: false,
+      });
+      const result = await pipeline.redact('I spoke with Jessica yesterday', 'sess-names-2');
+      expect(result.redactedText).toContain('Jessica');
+      expect(result.detectedPII.filter(d => d.type === 'names')).toHaveLength(0);
+    });
+
+    it('should deduplicate names already caught by dictionary', async () => {
+      const pipeline = await createPipeline(
+        { enableDictionary: true, enableRegex: false, enableNames: true, enableNER: false },
+        ['Jessica']
+      );
+      const result = await pipeline.redact('Ask Jessica about it', 'sess-names-3');
+      expect(result.redactedText).not.toContain('Jessica');
+      const dictDetections = result.detectedPII.filter(d => d.type === 'dictionary');
+      const namesDetections = result.detectedPII.filter(d => d.type === 'names');
+      expect(dictDetections.length).toBeGreaterThanOrEqual(1);
+      expect(namesDetections).toHaveLength(0);
+    });
   });
 
   describe('Multi-Layer Integration', () => {

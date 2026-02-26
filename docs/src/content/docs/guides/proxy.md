@@ -5,6 +5,19 @@ description: Use Anonamoose as a drop-in proxy for OpenAI and Anthropic APIs.
 
 Anonamoose acts as a transparent proxy between your application and LLM APIs. Point your SDK at Anonamoose instead of the upstream API, and PII is automatically redacted before it leaves your network.
 
+## Path formats
+
+Anonamoose supports endpoints both with and without the `/v1` prefix for maximum compatibility:
+
+| With prefix | Without prefix |
+|-------------|----------------|
+| `/v1/chat/completions` | `/chat/completions` |
+| `/v1/messages` | `/messages` |
+| `/v1/models` | `/models` |
+| `/v1/embeddings` | `/embeddings` |
+
+This ensures compatibility with clients like n8n that may strip or omit the `/v1` prefix.
+
 ## OpenAI
 
 ### cURL

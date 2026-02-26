@@ -45,6 +45,7 @@ const DEFAULT_NER_CONFIG: NERConfig = {
 
 export class NERLayer {
   private static pipelineInstance: TokenClassificationPipeline | null = null;
+  private static currentModel: string | null = null;
   private static loadFailed = false;
   private static lastLoadAttempt = 0;
   private static readonly RETRY_INTERVAL_MS = 60_000;
@@ -61,7 +62,16 @@ export class NERLayer {
     });
   }
 
-  private static async getPipeline(): Promise<TokenClassificationPipeline | null> {
+  private static async getPipeline(modelName?: string): Promise<TokenClassificationPipeline | null> {
+    const model = modelName || 'Xenova/bert-base-NER';
+
+    // If model changed, reset and reload
+    if (this.pipelineInstance && this.currentModel !== model) {
+      this.pipelineInstance = null;
+      this.loadFailed = false;
+      this.lastLoadAttempt = 0;
+    }
+
     if (this.pipelineInstance) return this.pipelineInstance;
 
     if (this.loadFailed && Date.now() - this.lastLoadAttempt < this.RETRY_INTERVAL_MS) {
@@ -72,10 +82,11 @@ export class NERLayer {
       this.lastLoadAttempt = Date.now();
       this.pipelineInstance = await pipeline(
         'token-classification',
-        'Xenova/bert-base-NER',
+        model,
         { dtype: 'q8' }
       ) as TokenClassificationPipeline;
       this.loadFailed = false;
+      this.currentModel = model;
       return this.pipelineInstance;
     } catch (err) {
       console.error('NER model load failed:', err);
@@ -84,15 +95,16 @@ export class NERLayer {
     }
   }
 
-  async redact(text: string): Promise<NERRedactResult> {
+  async redact(text: string, modelName?: string, minConfidence?: number): Promise<NERRedactResult> {
     const tokens = new Map<string, string>();
     const detections: PIIDetection[] = [];
+    const confidence = minConfidence ?? this.config.minConfidence;
 
     if (text.length > NERLayer.MAX_INPUT_LENGTH) {
       return { text, tokens, detections };
     }
 
-    const ner = await NERLayer.getPipeline();
+    const ner = await NERLayer.getPipeline(modelName);
     if (!ner) {
       return { text, tokens, detections };
     }
@@ -112,7 +124,7 @@ export class NERLayer {
     // Filter by confidence and allowed entity types
     const filtered = uniqueEntities.filter(
       (e) =>
-        e.score >= this.config.minConfidence &&
+        e.score >= confidence &&
         this.config.entityTypes.includes(e.category)
     );
 
@@ -211,5 +223,6 @@ export class NERLayer {
     this.pipelineInstance = null;
     this.loadFailed = false;
     this.lastLoadAttempt = 0;
+    this.currentModel = null;
   }
 }

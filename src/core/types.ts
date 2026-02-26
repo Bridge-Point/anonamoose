@@ -1,5 +1,5 @@
 export interface PIIDetection {
-  type: 'dictionary' | 'regex' | 'ner';
+  type: 'dictionary' | 'regex' | 'names' | 'ner';
   category: string;
   value: string;
   startIndex: number;
@@ -17,7 +17,10 @@ export interface RedactionResult {
 export interface RedactionConfig {
   enableDictionary: boolean;
   enableRegex: boolean;
+  enableNames: boolean;
   enableNER: boolean;
+  nerModel: string;
+  nerMinConfidence: number;
   tokenizePlaceholders: boolean;
   placeholderPrefix: string;
   placeholderSuffix: string;
@@ -51,14 +54,5 @@ export interface ProxyConfig {
   managementPort: number;
   openaiKey?: string;
   anthropicKey?: string;
-  redisUrl?: string;
+  dbPath?: string;
 }
-
-export const DEFAULT_REDACTION_CONFIG: RedactionConfig = {
-  enableDictionary: true,
-  enableRegex: true,
-  enableNER: true, // Transformer model loads lazily on first NER call
-  tokenizePlaceholders: true,
-  placeholderPrefix: '\uE000',
-  placeholderSuffix: '\uE001'
-};

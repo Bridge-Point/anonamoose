@@ -2,33 +2,39 @@ import type { RedactionConfig, RedactionResult, PIIDetection } from '../types.js
 import { DictionaryService } from './dictionary.js';
 import { DEFAULT_PATTERNS } from './regex-layer.js';
 import { Tokenizer } from './tokenizer.js';
+import { NamesLayer } from './names-layer.js';
 import { NERLayer } from './ner-layer.js';
 
 export class RedactionPipeline {
   private tokenizer: Tokenizer;
+  private namesLayer: NamesLayer;
   private nerLayer: NERLayer;
 
   constructor(
     private dictionary: DictionaryService,
-    private config: RedactionConfig
+    private getConfig: () => RedactionConfig
   ) {
     this.tokenizer = new Tokenizer();
+    this.namesLayer = new NamesLayer((text) => {
+      return this.tokenizer.generatePlaceholder();
+    });
     this.nerLayer = new NERLayer({}, (text) => {
       return this.tokenizer.generatePlaceholder();
     });
-    
+
     this.dictionary.setTokenizer((text) => {
       return this.tokenizer.generatePlaceholder();
     });
   }
 
   async redact(text: string, sessionId: string): Promise<RedactionResult> {
+    const config = this.getConfig();
     const tokens = new Map<string, string>();
     const detections: PIIDetection[] = [];
     let result = text;
 
     // LAYER 1: Dictionary (GUARANTEED - always runs first)
-    if (this.config.enableDictionary) {
+    if (config.enableDictionary) {
       const dictResult = await this.dictionary.redact(result, sessionId);
       for (const [token, original] of dictResult.tokens) {
         tokens.set(token, original);
@@ -37,19 +43,9 @@ export class RedactionPipeline {
       result = dictResult.text;
     }
 
-    // LAYER 2: Regex (deterministic patterns)
-    if (this.config.enableRegex) {
-      const regexResult = this.redactRegex(result);
-      for (const [token, original] of regexResult.tokens) {
-        tokens.set(token, original);
-      }
-      detections.push(...regexResult.detections);
-      result = regexResult.text;
-    }
-
-    // LAYER 3: NER (probabilistic, context-aware)
-    if (this.config.enableNER) {
-      const nerResult = await this.nerLayer.redact(result);
+    // LAYER 2: NER (probabilistic, context-aware — runs early for best accuracy on natural text)
+    if (config.enableNER) {
+      const nerResult = await this.nerLayer.redact(result, config.nerModel, config.nerMinConfidence);
       const newDetections = nerResult.detections.filter(
         d => !detections.some(existing =>
           existing.value === d.value && existing.category === d.category
@@ -62,8 +58,35 @@ export class RedactionPipeline {
       result = nerResult.text;
     }
 
+    // LAYER 3: Regex (deterministic patterns)
+    if (config.enableRegex) {
+      const regexResult = this.redactRegex(result);
+      for (const [token, original] of regexResult.tokens) {
+        tokens.set(token, original);
+      }
+      detections.push(...regexResult.detections);
+      result = regexResult.text;
+    }
+
+    // LAYER 4: Names (fast deterministic name detection)
+    if (config.enableNames) {
+      const namesResult = this.namesLayer.redact(result);
+      const newNameDetections = namesResult.detections.filter(
+        d => !detections.some(existing =>
+          existing.value === d.value && existing.category === d.category
+        )
+      );
+      for (const [token, original] of namesResult.tokens) {
+        if (newNameDetections.some(d => d.value === original)) {
+          tokens.set(token, original);
+        }
+      }
+      detections.push(...newNameDetections);
+      result = namesResult.text;
+    }
+
     // Tokenize placeholders if enabled
-    if (this.config.tokenizePlaceholders) {
+    if (config.tokenizePlaceholders) {
       result = this.tokenizer.tokenize(result, tokens);
     }
 
@@ -78,22 +101,22 @@ export class RedactionPipeline {
   private redactRegex(text: string): { text: string; tokens: Map<string, string>; detections: PIIDetection[] } {
     const tokens = new Map<string, string>();
     const detections: PIIDetection[] = [];
-    
+
     for (const pattern of DEFAULT_PATTERNS) {
       const matches = [...text.matchAll(pattern.pattern)];
-      
+
       for (const match of matches) {
         const value = match[0];
-        
+
         if (pattern.validator && !pattern.validator(value)) {
           continue;
         }
 
         const token = this.tokenizer.generatePlaceholder();
-        
+
         if (!tokens.has(token)) {
           tokens.set(token, value);
-          
+
           detections.push({
             type: 'regex',
             category: pattern.name,

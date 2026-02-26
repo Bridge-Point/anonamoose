@@ -1,19 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import Database from 'better-sqlite3';
+import { initializeSchema } from '../../src/core/database.js';
 import { RehydrationStore } from '../../src/core/rehydration/store.js';
 
-describe('RehydrationStore (in-memory)', () => {
+describe('RehydrationStore (SQLite)', () => {
+  let db: InstanceType<typeof Database>;
   let store: RehydrationStore;
 
+  const VALID_SESSION_ID = '550e8400-e29b-41d4-a716-446655440000';
+  const VALID_SESSION_ID_2 = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
   beforeEach(() => {
-    store = new RehydrationStore();
+    db = new Database(':memory:');
+    initializeSchema(db);
+    store = new RehydrationStore(db);
   });
 
   afterEach(() => {
     store.destroy();
+    db.close();
   });
-
-  const VALID_SESSION_ID = '550e8400-e29b-41d4-a716-446655440000';
-  const VALID_SESSION_ID_2 = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
   it('should store and retrieve a session', async () => {
     const tokens = new Map([
@@ -133,7 +139,8 @@ describe('RehydrationStore (in-memory)', () => {
     const stats = await store.getStorageStats();
     expect(stats.sessionCount).toBe(1);
     expect(stats.totalTokens).toBe(2);
-    expect(stats.redisConnected).toBe(false);
+    expect(stats.storageConnected).toBe(true);
+    expect(stats.dbSize).toBeDefined();
   });
 
   it('should get active session count', async () => {
@@ -142,7 +149,7 @@ describe('RehydrationStore (in-memory)', () => {
 
     const stats = await store.getStats();
     expect(stats.activeSessions).toBe(1);
-    expect(stats.redisConnected).toBe(false);
+    expect(stats.storageConnected).toBe(true);
   });
 
   it('should get all sessions sorted by creation date', async () => {
@@ -178,14 +185,26 @@ describe('RehydrationStore (in-memory)', () => {
     expect(session).toBeNull();
   });
 
-  it('should return 0 from cleanup (in-memory TTL handled elsewhere)', async () => {
+  it('should clean up expired sessions', async () => {
+    const tokens = new Map([['\uE000t\uE001', 'data']]);
+    await store.store(VALID_SESSION_ID, tokens, 0);
+
+    await new Promise(r => setTimeout(r, 10));
+
     const count = await store.cleanup();
-    expect(count).toBe(0);
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    // Verify the session was removed from the database
+    const row = db.prepare('SELECT COUNT(*) as count FROM sessions').get() as { count: number };
+    expect(row.count).toBe(0);
   });
 
   it('should destroy without error', () => {
-    const tempStore = new RehydrationStore();
+    const tempDb = new Database(':memory:');
+    initializeSchema(tempDb);
+    const tempStore = new RehydrationStore(tempDb);
     expect(() => tempStore.destroy()).not.toThrow();
+    tempDb.close();
   });
 
   it('should search by category', async () => {
@@ -231,79 +250,18 @@ describe('RehydrationStore (in-memory)', () => {
     expect(result).toBe(false);
   });
 
-  // ── cleanupExpired (in-memory path) ─────────────────────────
-  it('should clean up expired sessions when cleanupExpired runs', async () => {
-    const storeAny = store as any;
-
-    // Insert an already-expired session directly into localSessions
-    storeAny.localSessions.set(VALID_SESSION_ID, {
-      sessionId: VALID_SESSION_ID,
-      tokens: [],
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() - 1000).toISOString(), // expired 1s ago
-      lastAccessedAt: new Date().toISOString(),
-    });
-
-    expect(storeAny.localSessions.size).toBe(1);
-
-    // Trigger cleanup
-    storeAny.cleanupExpired();
-
-    expect(storeAny.localSessions.size).toBe(0);
-  });
-
-  it('should not clean up non-expired sessions', async () => {
-    const storeAny = store as any;
-
-    storeAny.localSessions.set(VALID_SESSION_ID, {
-      sessionId: VALID_SESSION_ID,
-      tokens: [],
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 3600_000).toISOString(), // 1hr from now
-      lastAccessedAt: new Date().toISOString(),
-    });
-
-    storeAny.cleanupExpired();
-    expect(storeAny.localSessions.size).toBe(1);
-  });
-
-  // ── evictIfNeeded ───────────────────────────────────────────
-  it('should evict oldest 10% when at capacity', () => {
-    const storeAny = store as any;
-
-    // Manually fill localSessions to MAX_LOCAL_SESSIONS (10000)
-    for (let i = 0; i < 10000; i++) {
+  it('should handle many sessions without eviction limits', async () => {
+    const tokens = new Map([['\uE000t\uE001', 'data']]);
+    // SQLite has no arbitrary session limit like the old in-memory store
+    for (let i = 0; i < 100; i++) {
       const id = `${i.toString(16).padStart(8, '0')}-0000-0000-0000-000000000000`;
-      storeAny.localSessions.set(id, {
-        sessionId: id,
-        tokens: [],
-        createdAt: new Date(Date.now() - (10000 - i) * 1000).toISOString(), // oldest first
-        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
-        lastAccessedAt: new Date().toISOString(),
-      });
+      await store.store(id, tokens);
     }
-
-    expect(storeAny.localSessions.size).toBe(10000);
-
-    // Trigger eviction
-    storeAny.evictIfNeeded();
-
-    // Should have evicted 10% = 1000 oldest sessions
-    expect(storeAny.localSessions.size).toBe(9000);
+    expect(await store.size()).toBe(100);
   });
 
-  it('should not evict when under capacity', () => {
-    const storeAny = store as any;
-
-    storeAny.localSessions.set(VALID_SESSION_ID, {
-      sessionId: VALID_SESSION_ID,
-      tokens: [],
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
-      lastAccessedAt: new Date().toISOString(),
-    });
-
-    storeAny.evictIfNeeded();
-    expect(storeAny.localSessions.size).toBe(1);
+  it('should return db size in storage stats', async () => {
+    const stats = await store.getStorageStats();
+    expect(stats.dbSize).toMatch(/^\d+(\.\d+)?(B|KB|MB)$/);
   });
 });

@@ -1,9 +1,9 @@
-import Redis from 'ioredis';
+import type { SqliteDatabase } from '../database.js';
 
 export interface TokenEntry {
   original: string;
   tokenized: string;
-  type: 'dictionary' | 'regex' | 'ner';
+  type: 'dictionary' | 'regex' | 'names' | 'ner';
   category: string;
   meta?: Record<string, string>;
 }
@@ -16,69 +16,23 @@ export interface SessionData {
   lastAccessedAt: string;
 }
 
-const MAX_LOCAL_SESSIONS = 10000;
 const CLEANUP_INTERVAL_MS = 60 * 1000;
 const SESSION_ID_REGEX = /^[a-f0-9\-]{36}$/i;
 
 export class RehydrationStore {
-  private redis?: Redis;
-  private localSessions: Map<string, SessionData> = new Map();
+  private db: SqliteDatabase;
   private defaultTTL = 3600;
   private cleanupTimer: ReturnType<typeof setInterval>;
 
-  constructor(redisUrl?: string) {
-    if (redisUrl) {
-      try {
-        this.redis = new Redis(redisUrl, {
-          maxRetriesPerRequest: 3,
-          lazyConnect: true,
-          connectTimeout: 5000,
-        });
-        this.redis.connect().catch(() => {
-          console.warn('Redis connection failed, using in-memory store');
-        });
-      } catch (e) {
-        console.warn('Redis connection failed, using in-memory store:', e);
-      }
-    }
-
-    // Periodically clean expired in-memory sessions
+  constructor(db: SqliteDatabase) {
+    this.db = db;
     this.cleanupTimer = setInterval(() => this.cleanupExpired(), CLEANUP_INTERVAL_MS);
   }
 
-  private cleanupExpired(): void {
-    if (this.redis) return;
-    const now = new Date();
-    for (const [id, session] of this.localSessions) {
-      if (now > new Date(session.expiresAt)) {
-        this.localSessions.delete(id);
-      }
-    }
-  }
-
-  private evictIfNeeded(): void {
-    if (this.localSessions.size < MAX_LOCAL_SESSIONS) return;
-
-    // Evict oldest sessions first
-    const sorted = [...this.localSessions.entries()]
-      .sort((a, b) => new Date(a[1].createdAt).getTime() - new Date(b[1].createdAt).getTime());
-
-    const toEvict = sorted.slice(0, Math.floor(MAX_LOCAL_SESSIONS * 0.1));
-    for (const [id] of toEvict) {
-      this.localSessions.delete(id);
-    }
-  }
-
-  private async scanKeys(pattern: string): Promise<string[]> {
-    if (!this.redis) return [];
-    const keys: string[] = [];
-    let cursor = '0';
-    do {
-      const [nextCursor, batch] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-      cursor = nextCursor;
-      keys.push(...batch);
-    } while (cursor !== '0');
-    return keys;
+  private cleanupExpired(): number {
+    const now = new Date().toISOString();
+    const result = this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
+    return result.changes;
   }
 
   private static isValidSessionId(id: string): boolean {
@@ -89,80 +43,66 @@ export class RehydrationStore {
     sessionId: string,
     tokens: Map<string, string>,
     ttlSeconds: number = this.defaultTTL,
-    type: 'dictionary' | 'regex' | 'ner' = 'regex',
+    type: 'dictionary' | 'regex' | 'names' | 'ner' = 'regex',
     category: string = 'PII',
     meta?: Record<string, string>
   ): Promise<void> {
     if (!RehydrationStore.isValidSessionId(sessionId)) {
       throw new Error('Invalid session ID format');
     }
-    const now = new Date().toISOString();
 
-    // Deduplicate tokens - if same original value exists, don't add again
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+
+    // Get existing session data for deduplication
     const existingData = await this.retrieve(sessionId);
     const existingTokens = existingData?.tokens || [];
     const existingOriginals = new Set(existingTokens.map(t => t.original.toLowerCase()));
 
     const newTokens: TokenEntry[] = [];
-
     for (const [tokenized, original] of tokens) {
       if (!existingOriginals.has(original.toLowerCase())) {
-        newTokens.push({
-          original,
-          tokenized,
-          type,
-          category,
-          meta
-        });
+        newTokens.push({ original, tokenized, type, category, meta });
         existingOriginals.add(original.toLowerCase());
       }
     }
 
     const allTokens = [...existingTokens, ...newTokens];
-
     const session: SessionData = {
       sessionId,
       tokens: allTokens,
       createdAt: existingData?.createdAt || now,
-      expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
-      lastAccessedAt: now
+      expiresAt,
+      lastAccessedAt: now,
     };
 
-    if (this.redis) {
-      const key = `anonamoose:session:${sessionId}`;
-      const data = JSON.stringify(session);
-      await this.redis.setex(key, ttlSeconds, data);
-    } else {
-      this.evictIfNeeded();
-      this.localSessions.set(sessionId, session);
-    }
+    this.db.prepare(`
+      INSERT INTO sessions (session_id, data, created_at, expires_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(session_id) DO UPDATE SET
+        data = excluded.data,
+        created_at = excluded.created_at,
+        expires_at = excluded.expires_at,
+        updated_at = excluded.updated_at
+    `).run(sessionId, JSON.stringify(session), session.createdAt, expiresAt, now);
   }
 
   async retrieve(sessionId: string): Promise<SessionData | null> {
     if (!RehydrationStore.isValidSessionId(sessionId)) {
       return null;
     }
-    if (this.redis) {
-      const key = `anonamoose:session:${sessionId}`;
-      const data = await this.redis.get(key);
 
-      if (!data) return null;
+    const now = new Date().toISOString();
+    const row = this.db.prepare(
+      'SELECT data FROM sessions WHERE session_id = ? AND expires_at > ?'
+    ).get(sessionId, now) as { data: string } | undefined;
 
-      try {
-        return JSON.parse(data);
-      } catch {
-        return null;
-      }
-    } else {
-      const session = this.localSessions.get(sessionId);
-      if (!session) return null;
+    if (!row) return null;
 
-      if (new Date() > new Date(session.expiresAt)) {
-        this.localSessions.delete(sessionId);
-        return null;
-      }
-
-      return session;
+    try {
+      return JSON.parse(row.data);
+    } catch {
+      return null;
     }
   }
 
@@ -174,7 +114,6 @@ export class RehydrationStore {
     for (const token of session.tokens) {
       result = result.replaceAll(token.tokenized, token.original);
     }
-
     return result;
   }
 
@@ -182,77 +121,50 @@ export class RehydrationStore {
     if (!RehydrationStore.isValidSessionId(sessionId)) {
       return false;
     }
-    if (this.redis) {
-      const result = await this.redis.del(`anonamoose:session:${sessionId}`);
-      return result > 0;
-    } else {
-      return this.localSessions.delete(sessionId);
-    }
+    const result = this.db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId);
+    return result.changes > 0;
   }
 
   async deleteAll(): Promise<number> {
-    if (this.redis) {
-      const keys = await this.scanKeys('anonamoose:session:*');
-      if (keys.length > 0) {
-        return await this.redis.del(...keys);
-      }
-      return 0;
-    } else {
-      const count = this.localSessions.size;
-      this.localSessions.clear();
-      return count;
-    }
+    const result = this.db.prepare('DELETE FROM sessions').run();
+    return result.changes;
   }
 
   async extend(sessionId: string, ttlSeconds: number): Promise<boolean> {
     if (!RehydrationStore.isValidSessionId(sessionId)) {
       return false;
     }
-    if (this.redis) {
-      const key = `anonamoose:session:${sessionId}`;
-      const result = await this.redis.expire(key, ttlSeconds);
-      return result === 1;
-    } else {
-      const session = this.localSessions.get(sessionId);
-      if (!session) return false;
-
-      session.expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
-      return true;
-    }
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
+    const now = new Date().toISOString();
+    const result = this.db.prepare(
+      'UPDATE sessions SET expires_at = ?, updated_at = ? WHERE session_id = ?'
+    ).run(expiresAt, now, sessionId);
+    return result.changes > 0;
   }
 
   async size(): Promise<number> {
-    if (this.redis) {
-      const keys = await this.scanKeys('anonamoose:session:*');
-      return keys.length;
-    } else {
-      return this.localSessions.size;
-    }
+    const now = new Date().toISOString();
+    const row = this.db.prepare(
+      'SELECT COUNT(*) as count FROM sessions WHERE expires_at > ?'
+    ).get(now) as { count: number };
+    return row.count;
   }
 
   async getAllSessions(): Promise<SessionData[]> {
-    if (this.redis) {
-      const keys = await this.scanKeys('anonamoose:session:*');
-      const sessions: SessionData[] = [];
+    const now = new Date().toISOString();
+    const rows = this.db.prepare(
+      'SELECT data FROM sessions WHERE expires_at > ? ORDER BY created_at DESC'
+    ).all(now) as { data: string }[];
 
-      for (const key of keys) {
-        const data = await this.redis.get(key);
-        if (data) {
-          try {
-            sessions.push(JSON.parse(data));
-          } catch {
-            // Skip invalid data
-          }
-        }
+    const sessions: SessionData[] = [];
+    for (const row of rows) {
+      try {
+        sessions.push(JSON.parse(row.data));
+      } catch {
+        // Skip invalid data
       }
-
-      return sessions.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    } else {
-      return Array.from(this.localSessions.values())
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
+    return sessions;
   }
 
   async search(query: string): Promise<SessionData[]> {
@@ -271,51 +183,48 @@ export class RehydrationStore {
   async getStorageStats(): Promise<{
     sessionCount: number;
     totalTokens: number;
-    redisConnected: boolean;
-    memoryUsage?: string;
+    storageConnected: boolean;
+    dbSize?: string;
   }> {
     const sessions = await this.getAllSessions();
     const totalTokens = sessions.reduce((sum, s) => sum + s.tokens.length, 0);
 
-    let memoryUsage: string | undefined;
-
-    if (this.redis && this.redis.status === 'ready') {
-      try {
-        const info = await this.redis.info('memory');
-        const usedMatch = info.match(/used_memory_human:(\S+)/);
-        if (usedMatch) {
-          memoryUsage = usedMatch[1];
-        }
-      } catch {
-        // Ignore memory info errors
-      }
+    let dbSize: string | undefined;
+    try {
+      const pageCount = this.db.pragma('page_count', { simple: true }) as number;
+      const pageSize = this.db.pragma('page_size', { simple: true }) as number;
+      const bytes = pageCount * pageSize;
+      dbSize = formatBytes(bytes);
+    } catch {
+      // Ignore pragma errors
     }
 
     return {
       sessionCount: sessions.length,
       totalTokens,
-      redisConnected: this.redis ? this.redis.status === 'ready' : false,
-      memoryUsage
+      storageConnected: true,
+      dbSize,
     };
   }
 
   async cleanup(): Promise<number> {
-    // Redis handles TTL automatically
-    return 0;
+    return this.cleanupExpired();
   }
 
-  async getStats(): Promise<{ activeSessions: number; redisConnected: boolean }> {
-    const redisConnected = this.redis ? this.redis.status === 'ready' || this.redis.status === 'connect' : false;
+  async getStats(): Promise<{ activeSessions: number; storageConnected: boolean }> {
     return {
       activeSessions: await this.size(),
-      redisConnected
+      storageConnected: true,
     };
   }
 
   destroy(): void {
     clearInterval(this.cleanupTimer);
-    if (this.redis) {
-      this.redis.disconnect();
-    }
   }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }

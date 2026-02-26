@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { ProxyServer } from './proxy/server.js';
 import type { ProxyConfig } from './core/types.js';
 
@@ -6,7 +7,7 @@ const config: ProxyConfig = {
   managementPort: parseInt(process.env.MGMT_PORT || '3001', 10),
   openaiKey: process.env.OPENAI_API_KEY,
   anthropicKey: process.env.ANTHROPIC_API_KEY,
-  redisUrl: process.env.REDIS_URL
+  dbPath: process.env.ANONAMOOSE_DB_PATH
 };
 
 const server = new ProxyServer(config);

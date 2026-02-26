@@ -7,28 +7,28 @@ description: All environment variables supported by Anonamoose.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `PORT` | No | `3000` | Port for the proxy server (OpenAI/Anthropic passthrough and direct redaction) |
-| `MGMT_PORT` | No | `3001` | Port for the management API (dictionary, sessions, stats) |
+| `PORT` | No | `3000` | Port for the proxy server (OpenAI/Anthropic passthrough, direct redaction, and management API) |
+| `MGMT_PORT` | No | `3001` | Port for the management API (dictionary, sessions, stats, settings) |
 
 ## LLM API Keys
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `OPENAI_API_KEY` | No | — | OpenAI API key. Only needed if using the `/v1/chat/completions` proxy endpoint. Clients can also pass their own key via the `Authorization` header. |
-| `ANTHROPIC_API_KEY` | No | — | Anthropic API key. Only needed if using the `/v1/messages` proxy endpoint. Clients can also pass their own key via the `Authorization` header. |
+| `OPENAI_API_KEY` | No | — | OpenAI API key. Only needed if using the proxy endpoint without a client-provided key. Clients can pass their own key via the `Authorization` header. |
+| `ANTHROPIC_API_KEY` | No | — | Anthropic API key. Only needed if using the proxy endpoint without a client-provided key. Clients can pass their own key via the `Authorization` header. |
 
 ## Storage
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `REDIS_URL` | No | — | Redis connection URL (e.g. `redis://localhost:6379`). When set, sessions are stored in Redis with automatic TTL expiry. When not set, sessions are stored in-memory and lost on restart. |
+| `ANONAMOOSE_DB_PATH` | No | `./data/anonamoose.db` | Path to the SQLite database file. Sessions and settings are stored here with automatic TTL expiry. The directory is created automatically if it doesn't exist. |
 
 ## Authentication
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `API_TOKEN` | No | — | Bearer token for management API endpoints (`/api/v1/*`). When not set, management endpoints are unauthenticated. |
-| `STATS_TOKEN` | No* | — | Bearer token for the stats endpoint and dashboard. *Must be set to access `/api/v1/stats`. |
+| `API_TOKEN` | No | — | Bearer token for management API endpoints (`/api/v1/*`) and the admin panel. When not set, management endpoints are unauthenticated. This is the primary authentication token. |
+| `STATS_TOKEN` | No | — | Alternative bearer token accepted for stats endpoints. Useful for giving the dashboard stats access without sharing the full `API_TOKEN`. |
 
 ## Docker Compose
 
@@ -37,6 +37,5 @@ When using Docker Compose, these are set automatically by the compose file:
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `NODE_ENV` | `production` | Node.js environment |
-| `REDIS_URL` | `redis://redis:6379` | Points to the Redis container |
 
 All other variables should be set in a `.env` file at the project root, which Docker Compose reads automatically.

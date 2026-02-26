@@ -14,12 +14,9 @@ Every redaction in Anonamoose creates a **session** — a mapping of tokenized p
 
 ## Session storage
 
-| Backend | Configuration | Persistence |
-|---------|--------------|-------------|
-| In-memory | Default (no config) | Lost on restart |
-| Redis | Set `REDIS_URL` | Persistent with TTL |
+Sessions are stored in **SQLite** and persist across restarts. The database path is configured via `ANONAMOOSE_DB_PATH` (default `./data/anonamoose.db`).
 
-Sessions have a default TTL of **1 hour** (3600 seconds).
+Sessions have a default TTL of **1 hour** (3600 seconds). Expired sessions are automatically cleaned up.
 
 ## Session API
 

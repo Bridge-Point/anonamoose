@@ -61,8 +61,7 @@ PUA characters are ideal for tokenization because:
 
 Token mappings are stored in sessions, keyed by a session ID:
 
-- **In-memory** (default) — Fast, but lost on restart
-- **Redis** — Persistent, supports TTL-based expiry
+- **SQLite** — Persistent, supports TTL-based expiry with automatic cleanup
 
 Each session stores:
 - `sessionId` — Unique identifier

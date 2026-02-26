@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, ShieldAlert, ShieldCheck, Activity, Database, Settings } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck, Activity, Database, Settings, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 
@@ -11,10 +11,11 @@ interface Stats {
   piiDetected: number;
   dictionaryHits: number;
   regexHits: number;
+  namesHits: number;
   nerHits: number;
   activeSessions: number;
   dictionarySize: number;
-  redisConnected: boolean;
+  storageConnected: boolean;
 }
 
 export default function Dashboard() {
@@ -24,12 +25,12 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/stats');
-      
+      const response = await fetch('/api/v1/stats/public');
+
       if (!response.ok) {
         throw new Error('Failed to fetch stats');
       }
-      
+
       const data = await response.json();
       setStats(data);
       setError(null);
@@ -89,11 +90,14 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${stats?.redisConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className={`h-2 w-2 rounded-full ${stats?.storageConnected ? 'bg-green-500' : 'bg-red-500'}`} />
                 <span className="text-sm text-gray-600">
-                  {stats?.redisConnected ? 'Redis Connected' : 'Redis Disconnected'}
+                  {stats?.storageConnected ? 'Database Connected' : 'Database Disconnected'}
                 </span>
               </div>
+              <a href="https://docs.anonamoose.net" target="_blank" rel="noopener noreferrer" className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded" title="Documentation">
+                <BookOpen className="h-5 w-5" />
+              </a>
               <Link href="/admin" className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded" title="Admin Panel">
                 <Settings className="h-5 w-5" />
               </Link>
@@ -156,38 +160,67 @@ export default function Dashboard() {
               <CardDescription>PII detected by redaction layer</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Dictionary (Guaranteed)</span>
-                  <span className="text-lg font-bold text-green-600">{stats?.dictionaryHits}</span>
+              <div className="flex gap-3">
+                <div className="flex flex-col items-center pt-3 pb-1">
+                  <div className="w-0.5 flex-1 bg-blue-400" />
+                  <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[6px] border-t-blue-400" />
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-green-600 h-2 rounded-full"
-                    style={{ width: `${stats?.piiDetected ? ((stats?.dictionaryHits || 0) / (stats?.piiDetected || 1)) * 100 : 0}%` }}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Regex Patterns</span>
-                  <span className="text-lg font-bold text-blue-600">{stats?.regexHits}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${stats?.piiDetected ? ((stats?.regexHits || 0) / (stats?.piiDetected || 1)) * 100 : 0}%` }}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">NER Detection</span>
-                  <span className="text-lg font-bold text-purple-600">{stats?.nerHits}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-purple-600 h-2 rounded-full"
-                    style={{ width: `${stats?.piiDetected ? ((stats?.nerHits || 0) / (stats?.piiDetected || 1)) * 100 : 0}%` }}
-                  />
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Dictionary (Guaranteed)</span>
+                      <span className="text-lg font-bold text-green-600">{stats?.dictionaryHits}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">User-defined terms, always matched</p>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div
+                        className="bg-green-600 h-2 rounded-full"
+                        style={{ width: `${stats?.piiDetected ? ((stats?.dictionaryHits || 0) / (stats?.piiDetected || 1)) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Local AI</span>
+                      <span className="text-lg font-bold text-purple-600">{stats?.nerHits}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">AI-based entity recognition for names, orgs, locations</p>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div
+                        className="bg-purple-600 h-2 rounded-full"
+                        style={{ width: `${stats?.piiDetected ? ((stats?.nerHits || 0) / (stats?.piiDetected || 1)) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Regex Patterns</span>
+                      <span className="text-lg font-bold text-blue-600">{stats?.regexHits}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">Emails, phones, government IDs, credit cards</p>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full"
+                        style={{ width: `${stats?.piiDetected ? ((stats?.regexHits || 0) / (stats?.piiDetected || 1)) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Name Detection</span>
+                      <span className="text-lg font-bold text-orange-600">{stats?.namesHits}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">Common first names from known name lists</p>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div
+                        className="bg-orange-600 h-2 rounded-full"
+                        style={{ width: `${stats?.piiDetected ? ((stats?.namesHits || 0) / (stats?.piiDetected || 1)) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -218,9 +251,9 @@ export default function Dashboard() {
                   <span className="text-green-600 font-medium">Online</span>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-                  <span className="text-sm">Redis</span>
-                  <span className={stats?.redisConnected ? 'text-green-600' : 'text-red-600'}>
-                    {stats?.redisConnected ? 'Connected' : 'Disconnected'}
+                  <span className="text-sm">Database</span>
+                  <span className={stats?.storageConnected ? 'text-green-600' : 'text-red-600'}>
+                    {stats?.storageConnected ? 'Connected' : 'Disconnected'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-2 bg-green-50 rounded">
