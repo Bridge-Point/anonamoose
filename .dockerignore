@@ -4,7 +4,6 @@ node_modules
 .env.*
 tests
 docs
-ui
 coverage
 *.md
 .DS_Store
