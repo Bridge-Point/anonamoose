@@ -39,11 +39,13 @@ If your use of Anonamoose is connected to business activity of any kind, you nee
 
 ## Commercial licensing
 
-Commercial licences are available from Bridge Point Ltd. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz) for pricing and terms.
+Anonamoose is built and owned by [BridgePoint](https://bridgepoint.co.nz), a software consultancy based in New Zealand. All commercial licences are issued through BridgePoint.
+
+Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz) or visit [bridgepoint.co.nz](https://bridgepoint.co.nz) for pricing and terms.
 
 ## Full licence text
 
 The complete licence text is in the [LICENSE](https://github.com/Bridge-Point/anonamoose/blob/main/LICENSE) file in the repository.
 
-**Licensor:** Bridge Point Ltd
-**Licensed Work:** Anonamoose 1.0.0 — (c) 2026 Bridge Point Ltd.
+**Licensor:** BridgePoint Ltd — [bridgepoint.co.nz](https://bridgepoint.co.nz)
+**Licensed Work:** Anonamoose 1.0.0 — (c) 2026 BridgePoint Ltd.

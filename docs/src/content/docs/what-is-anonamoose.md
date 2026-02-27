@@ -167,6 +167,10 @@ This matters for compliance. The data stays in your network. You don't need a DP
 - **Developers building LLM-powered features** who want PII protection without rewriting their application code
 - **Companies with existing LLM integrations** (n8n, LangChain, custom apps) that want to add PII protection retroactively
 
+## Built by BridgePoint
+
+Anonamoose is built and maintained by [BridgePoint](https://bridgepoint.co.nz), a software consultancy based in New Zealand. It is licensed under [Business Source License 1.1](/licence/) — free for non-commercial use, commercial use requires a licence from BridgePoint.
+
 ## Next steps
 
 - [Getting Started](/getting-started/) — Install and make your first redacted request in under five minutes

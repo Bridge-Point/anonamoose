@@ -7,7 +7,7 @@
   <a href="https://bridge-point.github.io/anonamoose/coverage/"><img src="https://bridge-point.github.io/anonamoose/coverage/badge.svg" alt="Coverage"></a>
 </p>
 
-> **License:** Anonamoose is licensed under [Business Source License 1.1](./LICENSE). Free for personal projects and non-commercial use. Commercial use (including offering as a hosted service) requires a commercial license. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz).
+> **License:** Anonamoose is built and maintained by [BridgePoint](https://bridgepoint.co.nz) and licensed under [Business Source License 1.1](./LICENSE). Free for personal projects and non-commercial use. Commercial use (including offering as a hosted service) requires a commercial licence from BridgePoint. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz).
 
 **A drop-in proxy that strips PII from LLM requests before they leave your network. Also works as a standalone redaction API.**
 
@@ -161,12 +161,16 @@ Full documentation at [docs.anonamoose.net](https://docs.anonamoose.net).
 - [PII Patterns](https://docs.anonamoose.net/reference/pii-patterns/) — All detection patterns by region
 - [Compliance](https://docs.anonamoose.net/compliance/overview/) — HIPAA, GDPR, SOC 2, ISO 27001
 
+## Built by BridgePoint
+
+Anonamoose is built and maintained by [BridgePoint](https://bridgepoint.co.nz), a software consultancy based in New Zealand.
+
 ## License
 
-[Business Source License 1.1](./LICENSE) — (c) 2026 Bridge Point Ltd.
+[Business Source License 1.1](./LICENSE) — (c) 2026 BridgePoint Ltd.
 
 **Non-commercial use is permitted.** You may use, copy, modify, and redistribute Anonamoose for personal projects, research, education, and internal evaluation.
 
-**Commercial use requires a license.** If you or your organisation are using Anonamoose to generate revenue, provide services to customers, or operate as part of a business (including not-for-profits and offering it as a hosted service), you need a commercial license.
+**Commercial use requires a licence.** If you or your organisation are using Anonamoose to generate revenue, provide services to customers, or operate as part of a business (including not-for-profits and offering it as a hosted service), you need a commercial licence from BridgePoint.
 
-Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz) for commercial licensing.
+Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz) or visit [bridgepoint.co.nz](https://bridgepoint.co.nz) for commercial licensing.
