@@ -12,8 +12,6 @@ The Docker Compose setup runs Anonamoose and the admin panel as a single stack.
 1. Create a `.env` file in the project root:
 
 ```bash
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
 API_TOKEN=your-api-token
 ```
 
@@ -65,7 +63,7 @@ Anonamoose supports deployment on [Coolify](https://coolify.io/) as a Docker Com
 - `SERVICE_FQDN_ANONAMOOSE_3000` — public URL for the proxy
 - `SERVICE_FQDN_UI_3002` — public URL for the dashboard
 
-Set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `API_TOKEN` in the Coolify service environment variables.
+Set `API_TOKEN` in the Coolify service environment variables.
 
 ## Single container
 
@@ -75,7 +73,6 @@ For simpler deployments without the dashboard:
 docker build -t anonamoose -f docker/Dockerfile .
 docker run -p 3000:3000 \
   -e API_TOKEN=your-token \
-  -e OPENAI_API_KEY=sk-... \
   -v anonamoose-data:/app/data \
   anonamoose
 ```

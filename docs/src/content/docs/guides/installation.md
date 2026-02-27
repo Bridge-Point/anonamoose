@@ -65,8 +65,6 @@ This starts three services:
 Create a `.env` file in the project root before running:
 
 ```bash
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
 API_TOKEN=your-api-token
 ```
 

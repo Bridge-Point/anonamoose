@@ -11,11 +11,9 @@ Anonamoose is configured through environment variables (for server setup) and ru
 |----------|---------|-------------|
 | `PORT` | `3000` | Proxy server port |
 | `MGMT_PORT` | `3001` | Management API port |
-| `OPENAI_API_KEY` | — | OpenAI API key for proxy passthrough |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key for proxy passthrough |
 | `ANONAMOOSE_DB_PATH` | `./data/anonamoose.db` | SQLite database path. Sessions and settings are stored here. |
 | `API_TOKEN` | — | Bearer token for management API and admin panel authentication. If unset, management endpoints are unauthenticated. |
-| `STATS_TOKEN` | — | Alternative bearer token accepted for stats endpoints only. |
+| `STATS_TOKEN` | — | Bearer token for stats-only access. |
 
 ## Redaction pipeline settings
 

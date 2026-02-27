@@ -30,10 +30,6 @@ Create a `.env` file in the project root:
 ```bash
 # Protects the management API and admin panel
 API_TOKEN=your-api-token
-
-# Optional — provide if proxying to LLM APIs
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ## Run

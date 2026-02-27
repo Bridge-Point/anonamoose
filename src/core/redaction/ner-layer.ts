@@ -1,8 +1,8 @@
 import { pipeline, env, type TokenClassificationPipeline } from '@huggingface/transformers';
 import type { PIIDetection } from '../types.js';
 
-// Must be set before any pipeline calls
-env.allowRemoteModels = true;
+// Only allow local/cached models — remote loading disabled for security
+env.allowRemoteModels = false;
 if (process.env.NER_MODEL_CACHE) {
   env.cacheDir = process.env.NER_MODEL_CACHE;
 }

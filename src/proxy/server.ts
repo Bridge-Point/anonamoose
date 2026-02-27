@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual, createHash } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import express, { Request, Response, NextFunction } from 'express';
@@ -36,7 +36,6 @@ interface RedactionLogEntry {
   timestamp: string;
   source: 'api' | 'openai' | 'anthropic';
   sessionId: string;
-  inputPreview: string;
   redactedPreview: string;
   detections: { type: string; category: string; confidence: number }[];
 }
@@ -107,7 +106,6 @@ export class ProxyServer {
   private addRedactionLogEntry(
     source: RedactionLogEntry['source'],
     sessionId: string,
-    inputText: string,
     redactedText: string,
     detectedPII: { type: string; category: string; confidence: number }[]
   ): void {
@@ -119,7 +117,6 @@ export class ProxyServer {
       timestamp: new Date().toISOString(),
       source,
       sessionId,
-      inputPreview: inputText.length > 500 ? inputText.slice(0, 500) + '...' : inputText,
       redactedPreview: redactedText.length > 500 ? redactedText.slice(0, 500) + '...' : redactedText,
       detections: detectedPII,
     });
@@ -179,14 +176,10 @@ export class ProxyServer {
   }
 
   private safeCompare(a: string, b: string): boolean {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    if (bufA.length !== bufB.length) {
-      // Still do a comparison to avoid leaking length info via timing
-      timingSafeEqual(bufA, bufA);
-      return false;
-    }
-    return timingSafeEqual(bufA, bufB);
+    // Hash both to fixed-length buffers so timing doesn't leak token length
+    const hashA = createHash('sha256').update(a).digest();
+    const hashB = createHash('sha256').update(b).digest();
+    return timingSafeEqual(hashA, hashB);
   }
 
   private isAuthenticated(req: Request): boolean {
@@ -319,13 +312,14 @@ export class ProxyServer {
       res.json({ ok: true });
     });
 
-    // Protected routes — require API_TOKEN or STATS_TOKEN
+    // Protected routes — require API_TOKEN (or STATS_TOKEN for stats-only endpoints)
     api.use((req: Request, res: Response, next: NextFunction) => {
-      if (req.path === '/stats/public') {
+      const isStatsRoute = req.path === '/stats' || req.path === '/stats/public' || req.path === '/storage';
+      if (isStatsRoute && (this.isAuthenticated(req) || this.isStatsAuthenticated(req))) {
         next();
         return;
       }
-      if (!this.isAuthenticated(req) && !this.isStatsAuthenticated(req)) {
+      if (!this.isAuthenticated(req)) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
@@ -363,6 +357,31 @@ export class ProxyServer {
         const { settings } = req.body;
         if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
           res.status(400).json({ error: 'settings must be a non-null object' });
+          return;
+        }
+
+        // Allowlist of valid setting keys
+        const ALLOWED_KEYS = new Set([
+          'enableDictionary', 'enableRegex', 'enableNames', 'enableNER',
+          'nerModel', 'nerMinConfidence', 'locale',
+          'tokenizePlaceholders', 'placeholderPrefix', 'placeholderSuffix',
+        ]);
+
+        // Allowlist of permitted NER models
+        const ALLOWED_NER_MODELS = new Set([
+          'Xenova/bert-base-NER',
+          'Xenova/distilbert-NER',
+        ]);
+
+        const invalidKeys = Object.keys(settings).filter(k => !ALLOWED_KEYS.has(k));
+        if (invalidKeys.length > 0) {
+          res.status(400).json({ error: `Invalid setting key(s): ${invalidKeys.join(', ')}` });
+          return;
+        }
+
+        // Validate nerModel against allowlist
+        if ('nerModel' in settings && !ALLOWED_NER_MODELS.has(settings.nerModel)) {
+          res.status(400).json({ error: `Invalid NER model. Allowed: ${[...ALLOWED_NER_MODELS].join(', ')}` });
           return;
         }
 
@@ -429,6 +448,10 @@ export class ProxyServer {
         }
         if (typeof e.term !== 'string' || e.term.trim().length === 0) {
           res.status(400).json({ error: 'each entry must have a non-empty "term" string' });
+          return;
+        }
+        if (e.term.trim().length < 2) {
+          res.status(400).json({ error: 'term must be at least 2 characters' });
           return;
         }
         if (e.term.length > 1000) {
@@ -498,14 +521,9 @@ export class ProxyServer {
       }
     });
 
-    // Stats endpoint — requires STATS_TOKEN or API_TOKEN
+    // Stats endpoint — auth handled by middleware
     api.get('/stats', async (req: Request, res: Response) => {
       try {
-        if (!this.isStatsAuthenticated(req) && !this.isAuthenticated(req)) {
-          res.status(401).json({ error: 'Unauthorized — STATS_TOKEN or API_TOKEN required' });
-          return;
-        }
-
         const activeSessions = await this.rehydrationStore.size();
         const storeStats = await this.rehydrationStore.getStats();
         const storageStats = await this.rehydrationStore.getStorageStats();
@@ -832,7 +850,7 @@ export class ProxyServer {
       else if (pii.type === 'ner') this.stats.nerHits++;
     }
 
-    this.addRedactionLogEntry('api', sessionId, text, result.redactedText,
+    this.addRedactionLogEntry('api', sessionId, result.redactedText,
       result.detectedPII.map(d => ({ type: d.type, category: d.category, confidence: d.confidence }))
     );
 
@@ -925,7 +943,7 @@ export class ProxyServer {
         this.stats.requestsRedacted++;
 
         if (systemResult.detectedPII.length > 0) {
-          this.addRedactionLogEntry('anthropic', sessionId, req.body.system, systemResult.redactedText,
+          this.addRedactionLogEntry('anthropic', sessionId, systemResult.redactedText,
             systemResult.detectedPII.map(d => ({ type: d.type, category: d.category, confidence: d.confidence }))
           );
         }
@@ -989,7 +1007,7 @@ export class ProxyServer {
         }
 
         if (redactionResult.detectedPII.length > 0) {
-          this.addRedactionLogEntry(source, sessionId, msg.content, redactionResult.redactedText,
+          this.addRedactionLogEntry(source, sessionId, redactionResult.redactedText,
             redactionResult.detectedPII.map(d => ({ type: d.type, category: d.category, confidence: d.confidence }))
           );
         }
@@ -1022,7 +1040,7 @@ export class ProxyServer {
             }
 
             if (blockResult.detectedPII.length > 0) {
-              this.addRedactionLogEntry(source, sessionId, block.text, blockResult.redactedText,
+              this.addRedactionLogEntry(source, sessionId, blockResult.redactedText,
                 blockResult.detectedPII.map(d => ({ type: d.type, category: d.category, confidence: d.confidence }))
               );
             }
@@ -1186,7 +1204,7 @@ export class ProxyServer {
   }
 
   private async proxyToOpenAI(req: Request, res: Response): Promise<void> {
-    const apiKey = req.headers.authorization?.replace('Bearer ', '') || this.config.openaiKey;
+    const apiKey = req.headers.authorization?.replace('Bearer ', '');
     if (!apiKey) {
       res.status(401).json({ error: { message: 'Missing API key. Provide Bearer token in Authorization header.', type: 'invalid_request_error' } });
       return;

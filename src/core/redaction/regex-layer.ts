@@ -109,6 +109,22 @@ const ipV4Check = (ip: string): boolean => {
   });
 };
 
+const ipV6Check = (addr: string): boolean => {
+  // Handle :: abbreviation
+  if (addr === '::') return true;
+  const parts = addr.split('::');
+  if (parts.length > 2) return false;
+  if (parts.length === 2) {
+    const left = parts[0] ? parts[0].split(':') : [];
+    const right = parts[1] ? parts[1].split(':') : [];
+    if (left.length + right.length > 7) return false;
+    return [...left, ...right].every(g => /^[0-9a-fA-F]{1,4}$/.test(g));
+  }
+  const groups = addr.split(':');
+  if (groups.length !== 8) return false;
+  return groups.every(g => /^[0-9a-fA-F]{1,4}$/.test(g));
+};
+
 const ukNhsCheck = (num: string): boolean => {
   const digits = num.replace(/\D/g, '');
   if (digits.length !== 10) return false;
@@ -318,11 +334,12 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
     confidence: 0.90
   },
 
-  // IP Address (IPv6) — full, abbreviated (::), and mixed forms
+  // IP Address (IPv6) — simple pattern + validator to avoid ReDoS
   {
     id: 'ipv6-address',
     name: 'IPV6_ADDRESS',
-    pattern: /(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}|::(?:[0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4}|::)/g,
+    pattern: /(?<![:\w])[0-9a-fA-F:]{2,39}(?![:\w])/g,
+    validator: ipV6Check,
     confidence: 0.90
   },
 
@@ -396,7 +413,7 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
   {
     id: 'au-address',
     name: 'AU_ADDRESS',
-    pattern: /\b\d+\s+[A-Za-z\s]+(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Circuit|Cct)\b/gi,
+    pattern: /\b\d+\s+[A-Za-z][A-Za-z ]{0,60}(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Circuit|Cct)\b/gi,
     confidence: 0.75,
     country: ['AU']
   },
@@ -405,7 +422,7 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
   {
     id: 'nz-address',
     name: 'NZ_ADDRESS',
-    pattern: /\b\d+\s+[A-Za-z\s]+(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Terrace|Tce|Crescent|Cres)\b/gi,
+    pattern: /\b\d+\s+[A-Za-z][A-Za-z ]{0,60}(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Terrace|Tce|Crescent|Cres)\b/gi,
     confidence: 0.75,
     country: ['NZ']
   },
@@ -414,7 +431,7 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
   {
     id: 'uk-address',
     name: 'UK_ADDRESS',
-    pattern: /\b\d+\s+[A-Za-z\s]+(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Close|Cl|Way|Court|Ct|Gardens|Gdns|Terrace|Tce|Crescent|Cres)\b/gi,
+    pattern: /\b\d+\s+[A-Za-z][A-Za-z ]{0,60}(?:Street|St|Road|Rd|Avenue|Ave|Place|Pl|Drive|Dr|Lane|Ln|Close|Cl|Way|Court|Ct|Gardens|Gdns|Terrace|Tce|Crescent|Cres)\b/gi,
     confidence: 0.75,
     country: ['UK']
   },
@@ -469,7 +486,7 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
   {
     id: 'medical-record-number',
     name: 'MEDICAL_RECORD_NUMBER',
-    pattern: /(?:MRN|Medical Record|Patient ID|Patient No|Chart No|Record No|Hospital No|Health Record|UR No|URN|Unit Record)[:\s#\-./]*[A-Z0-9][-A-Z0-9]{2,}/gi,
+    pattern: /(?:MRN|Medical Record|Patient ID|Patient No|Chart No|Record No|Hospital No|Health Record|UR No|URN|Unit Record)[:\s#\-./]{0,10}[A-Z0-9][-A-Z0-9]{2,}/gi,
     confidence: 0.90
   },
 
@@ -477,7 +494,7 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
   {
     id: 'certificate-licence-number',
     name: 'CERTIFICATE_LICENCE_NUMBER',
-    pattern: /(?:Licen[cs]e|Certificate|Registration|Accreditation|Permit)\s*(?:No|Number|Num|#|ID)[:\s#\-./]*[A-Z0-9][-A-Z0-9]{2,}/gi,
+    pattern: /(?:Licen[cs]e|Certificate|Registration|Accreditation|Permit)\s*(?:No|Number|Num|#|ID)[:\s#\-./]{0,10}[A-Z0-9][-A-Z0-9]{2,}/gi,
     confidence: 0.88
   },
 ];

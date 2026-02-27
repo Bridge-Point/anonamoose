@@ -55,8 +55,6 @@ Create a `.env` file:
 
 ```bash
 API_TOKEN=your-api-token          # Protects management API and admin panel
-OPENAI_API_KEY=sk-...             # Optional — provide if proxying to OpenAI
-ANTHROPIC_API_KEY=sk-ant-...      # Optional — provide if proxying to Anthropic
 ```
 
 Run:
@@ -135,11 +133,9 @@ Your app                    Anonamoose                       LLM API
 |----------|---------|-------------|
 | `PORT` | `3000` | Proxy server port |
 | `MGMT_PORT` | `3001` | Management API port |
-| `OPENAI_API_KEY` | — | OpenAI API key for proxy passthrough |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key for proxy passthrough |
 | `ANONAMOOSE_DB_PATH` | `./data/anonamoose.db` | SQLite database path |
 | `API_TOKEN` | — | Bearer token for management API and admin panel |
-| `STATS_TOKEN` | — | Alternative bearer token for stats endpoint |
+| `STATS_TOKEN` | — | Bearer token for stats-only access |
 | `NER_MODEL_CACHE` | — | Custom cache directory for the NER model |
 
 ## Testing

@@ -53,7 +53,5 @@ export interface ContentBlock {
 export interface ProxyConfig {
   port: number;
   managementPort: number;
-  openaiKey?: string;
-  anthropicKey?: string;
   dbPath?: string;
 }

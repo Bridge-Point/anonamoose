@@ -40,7 +40,6 @@ interface RedactionLogEntry {
   timestamp: string;
   source: 'api' | 'openai' | 'anthropic';
   sessionId: string;
-  inputPreview: string;
   redactedPreview: string;
   detections: { type: string; category: string; confidence: number }[];
 }
@@ -886,12 +885,6 @@ export default function AdminPanel() {
                         {expandedRedaction === i && (
                           <div className="px-4 pb-4 space-y-3 border-t">
                             <div className="mt-3">
-                              <p className="text-xs font-medium text-gray-500 mb-1">Input</p>
-                              <div className="bg-gray-100 p-3 rounded font-mono text-xs whitespace-pre-wrap break-all">
-                                {r.inputPreview}
-                              </div>
-                            </div>
-                            <div>
                               <p className="text-xs font-medium text-gray-500 mb-1">Redacted</p>
                               <div className="bg-gray-900 text-green-400 p-3 rounded font-mono text-xs whitespace-pre-wrap break-all">
                                 {r.redactedPreview}
