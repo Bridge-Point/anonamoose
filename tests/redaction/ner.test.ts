@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { NERLayer } from '../../src/core/redaction/ner-layer.js';
 import type { RawEntity } from '../../src/core/redaction/ner-layer.js';
 
-describe('NER Layer (Transformer)', () => {
+// NER integration tests require the transformer model to be cached locally.
+// They are skipped in CI where the model is not available.
+const describeNER = process.env.CI ? describe.skip : describe;
+
+describeNER('NER Layer (Transformer)', () => {
   let nerLayer: NERLayer;
 
   beforeAll(() => {

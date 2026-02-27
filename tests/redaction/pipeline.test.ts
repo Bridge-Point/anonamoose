@@ -114,7 +114,11 @@ describe('Redaction Pipeline', () => {
     });
   });
 
-  describe('NER Layer (Probabilistic)', () => {
+  // NER integration tests require the transformer model to be cached locally.
+  // They are skipped in CI where the model is not available.
+  const describeNER = process.env.CI ? describe.skip : describe;
+
+  describeNER('NER Layer (Probabilistic)', () => {
     it('should redact person names', async () => {
       const pipeline = await createPipeline({
         enableDictionary: false, enableRegex: false, enableNames: false, enableNER: true,
