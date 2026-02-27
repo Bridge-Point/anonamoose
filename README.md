@@ -1,7 +1,11 @@
-# Anonamoose
+<p align="center">
+  <img src="assets/logo.png" alt="Anonamoose — Privacy Proxy for AI" width="500">
+</p>
 
-[![CI](https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml/badge.svg)](https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml)
-[![Coverage](https://bridge-point.github.io/anonamoose/coverage/badge.svg)](https://bridge-point.github.io/anonamoose/coverage/)
+<p align="center">
+  <a href="https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml"><img src="https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://bridge-point.github.io/anonamoose/coverage/"><img src="https://bridge-point.github.io/anonamoose/coverage/badge.svg" alt="Coverage"></a>
+</p>
 
 > **License:** Anonamoose is licensed under [Business Source License 1.1](./LICENSE). Free for personal projects and non-commercial use. Commercial use (including offering as a hosted service) requires a commercial license. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz).
 
