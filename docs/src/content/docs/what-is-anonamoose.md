@@ -113,7 +113,7 @@ You could build PII stripping into your application code, but a proxy approach h
 - **Language-agnostic** — Works with Python, Node.js, Go, Ruby, or anything that makes HTTP requests. If it can set a base URL, it works with Anonamoose.
 - **Separation of concerns** — Your application logic doesn't need to know about PII detection. The proxy handles it at the network layer.
 - **Consistent policy** — Redaction rules, dictionary entries, and detection settings apply uniformly to all traffic, managed centrally via the admin panel.
-- **Existing tooling works** — n8n workflows, LangChain agents, custom scripts — anything that uses the standard OpenAI or Anthropic SDK just works by changing the base URL.
+- **Existing tooling works** — LangChain agents, custom scripts, workflow tools — anything that uses the standard OpenAI or Anthropic SDK just works by changing the base URL.
 - **Audit trail** — Every redaction is logged centrally with what was detected, what type of PII it was, and the confidence level.
 
 ## What it detects
@@ -165,7 +165,7 @@ This matters for compliance. The data stays in your network. You don't need a DP
 - **Teams using LLMs with customer data** who need a technical control to prevent PII leaking to third-party APIs
 - **Healthcare and finance organisations** that need to demonstrate compliance controls for LLM usage
 - **Developers building LLM-powered features** who want PII protection without rewriting their application code
-- **Companies with existing LLM integrations** (n8n, LangChain, custom apps) that want to add PII protection retroactively
+- **Companies with existing LLM integrations** (LangChain, custom apps, workflow tools) that want to add PII protection retroactively
 
 ## Built by BridgePoint
 

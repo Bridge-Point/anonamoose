@@ -20,7 +20,6 @@ Anonamoose's dictionary layer solves this: **if you add a term, it will always b
 | **Streaming** | Limited | Full SSE streaming support |
 | **Rehydration** | Not built-in | Built-in session-based rehydration |
 | **LLM Proxy** | Not included | Drop-in OpenAI & Anthropic proxy |
-| **n8n integration** | No | Custom node available |
 | **AU/NZ/UK patterns** | Limited coverage | Comprehensive with validators (TFN, Medicare, IRD, NINO) |
 | **Stats dashboard** | No | Built-in (Next.js + shadcn) |
 | **Language** | Python | TypeScript/Node.js |

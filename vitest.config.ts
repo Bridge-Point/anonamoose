@@ -8,7 +8,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'html'],
       include: ['src/**/*.ts'],
-      exclude: ['src/index.ts', 'src/**/*.d.ts', 'src/n8n/**', 'src/proxy/**'],
+      exclude: ['src/index.ts', 'src/**/*.d.ts', 'src/proxy/**'],
     },
   },
 });

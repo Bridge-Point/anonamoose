@@ -16,7 +16,7 @@ Anonamoose supports endpoints both with and without the `/v1` prefix for maximum
 | `/v1/models` | `/models` |
 | `/v1/embeddings` | `/embeddings` |
 
-This ensures compatibility with clients like n8n that may strip or omit the `/v1` prefix.
+This ensures compatibility with clients that may strip or omit the `/v1` prefix.
 
 ## OpenAI
 

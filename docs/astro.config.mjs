@@ -46,7 +46,6 @@ export default defineConfig({
             { label: 'API', slug: 'reference/api' },
             { label: 'Environment Variables', slug: 'reference/environment-variables' },
             { label: 'PII Patterns', slug: 'reference/pii-patterns' },
-            { label: 'n8n Integration', slug: 'reference/n8n' },
           ],
         },
         {

@@ -41,7 +41,6 @@ curl -X POST http://localhost:3000/api/v1/redact \
 - **Self-hosted** — SQLite storage, local NER model, no telemetry. PII never leaves your infrastructure.
 - **Runtime configuration** — Change detection settings, NER model, locale, and confidence thresholds without restarting. Admin panel included.
 - **Management API** — Dictionary CRUD, session management, stats, and settings on a separate port.
-- **n8n integration** — Custom node for workflow automation.
 
 ## Quick start
 
