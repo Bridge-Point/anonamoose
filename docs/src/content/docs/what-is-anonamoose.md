@@ -5,6 +5,8 @@ description: A drop-in proxy that strips PII from LLM requests before they leave
 
 Anonamoose is a **drop-in proxy** that sits between your application and LLM APIs (OpenAI, Anthropic). It automatically strips personally identifiable information from every request before it leaves your network, and restores it in the response. Your code doesn't change. The LLM never sees the real data.
 
+It also works as a **standalone redaction API** — you don't need to proxy to a remote LLM provider at all. Send text to the `/api/v1/redact` endpoint and get back sanitized text with a full list of detections. Use it to strip PII from any data pipeline, log processing system, or application workflow where sensitive data needs to be cleaned before storage, export, or analysis.
+
 ## The problem
 
 Every time your application sends a prompt to an LLM API, you're transmitting data to a third party. If that data contains names, emails, phone numbers, medical records, or any other PII, you've just shared it with a company you don't control.
@@ -70,6 +72,38 @@ Your app                    Anonamoose                       OpenAI
 ```
 
 The LLM processes the request and generates a useful response — it just never sees the actual PII. The meaning of the prompt is preserved because the tokens are consistent within the session.
+
+## Standalone redaction API
+
+You don't need to proxy to an LLM to use Anonamoose. The `/api/v1/redact` endpoint accepts any text and returns sanitized output with detections — no LLM API key required, no upstream provider needed.
+
+```bash
+curl -X POST http://localhost:3000/api/v1/redact \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Patient John Smith (DOB 15/03/1985) called from 0412 345 678"}'
+```
+
+```json
+{
+  "redactedText": "Patient ░░░░░ (DOB ░░░░░) called from ░░░░░",
+  "sessionId": "abc-123",
+  "detections": [
+    { "type": "ner", "category": "PERSON", "confidence": 0.97 },
+    { "type": "regex", "category": "DOB", "confidence": 0.80 },
+    { "type": "regex", "category": "PHONE", "confidence": 0.92 }
+  ]
+}
+```
+
+Use this for:
+
+- **Data pipelines** — Sanitize records before they enter a data warehouse or analytics platform
+- **Log processing** — Strip PII from application logs before shipping to external logging services
+- **Data export** — Clean customer data before sharing with partners or third parties
+- **Batch processing** — Redact documents, support tickets, or chat transcripts in bulk
+- **Any workflow** where text needs to be cleaned of PII, independent of LLMs
+
+The same four-layer detection pipeline runs regardless of whether you're proxying to an LLM or using the direct API. You can also rehydrate later using the session ID if you need the original values back.
 
 ## Why a proxy, not a library
 

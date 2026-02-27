@@ -5,7 +5,7 @@
 
 > **License:** Anonamoose is licensed under [Business Source License 1.1](./LICENSE). Free for personal projects and non-commercial use. Commercial use (including offering as a hosted service) requires a commercial license. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz).
 
-**A drop-in proxy that strips PII from LLM requests before they leave your network.**
+**A drop-in proxy that strips PII from LLM requests before they leave your network. Also works as a standalone redaction API.**
 
 Point your OpenAI or Anthropic SDK at Anonamoose instead of the upstream API. PII is automatically redacted from every request, forwarded to the LLM, and rehydrated in the response. One line of configuration. No code changes.
 
@@ -17,9 +17,18 @@ client = OpenAI(base_url="https://api.openai.com/v1")
 client = OpenAI(base_url="http://localhost:3000/v1")
 ```
 
+Don't need an LLM? Use the direct redaction API to strip PII from any text — no upstream provider required:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/redact \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Patient John Smith (john@acme.com) called from 0412 345 678"}'
+```
+
 ## Features
 
 - **Drop-in proxy** — Change the base URL and everything works. OpenAI and Anthropic API-compatible. Full streaming support.
+- **Standalone redaction API** — Strip PII from any text via `/api/v1/redact` without proxying to an LLM. Use for data pipelines, log processing, data export, or any workflow that needs PII removed.
 - **Four-layer detection pipeline** — Dictionary (guaranteed) → Local AI/NER (transformer) → Regex (deterministic) → Name detection (safety net)
 - **Guaranteed redaction** — Dictionary rules provide 100% recall. If you add a term, it will always be caught.
 - **Local AI (NER)** — `bert-base-NER` (F1: 91.3) running natively in Node.js via ONNX. No Python, no external API calls. Automatic chunking for long texts.
