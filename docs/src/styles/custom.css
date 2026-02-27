@@ -47,8 +47,9 @@
 
 /* Bigger nav logo */
 .site-title img {
-  height: 5rem;
+  height: 4rem;
   width: auto;
+  margin-top: 0.5rem;
 }
 
 /* Tighter card grid */
