@@ -5,6 +5,10 @@ description: Install and run Anonamoose in under five minutes.
 
 Get Anonamoose running locally and make your first redacted request.
 
+:::caution[Licence]
+Anonamoose is licensed under [Business Source License 1.1](/licence/). **Free for personal and non-commercial use.** If you or your organisation are using Anonamoose for any commercial purpose — including internal business use, offering as a hosted service, or as part of a revenue-generating product — you need a commercial licence. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz).
+:::
+
 ## Prerequisites
 
 - Node.js 20+

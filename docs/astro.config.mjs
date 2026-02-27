@@ -21,6 +21,7 @@ export default defineConfig({
           items: [
             { label: 'What is Anonamoose?', slug: 'what-is-anonamoose' },
             { label: 'Getting Started', slug: 'getting-started' },
+            { label: 'Licence', slug: 'licence' },
           ],
         },
         {
