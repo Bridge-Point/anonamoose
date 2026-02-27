@@ -17,12 +17,12 @@ Tokenized: "Call \ue000a1b2c3d4\ue001 at \ue000e5f6g7h8\ue001"
 Each placeholder has the format:
 
 ```
-\ue000<8-char-uuid>\ue001
-  │                   │
-  prefix              suffix
+\ue000<16-char-hex-id>\ue001
+  │                      │
+  prefix                 suffix
 ```
 
-The 8-character ID is generated from a UUID v4, ensuring uniqueness within a session.
+The 16-character hex ID is generated from a UUID v4, providing a token space of 16^16 (~18.4 quintillion) possible unique tokens. In practice this is limitless — you will never run out of tokens regardless of how much data you process.
 
 ## Why PUA characters?
 
@@ -77,3 +77,34 @@ When storing tokens, Anonamoose deduplicates by original value (case-insensitive
 ## Streaming rehydration
 
 For streaming responses (SSE), Anonamoose rehydrates tokens in each chunk as it arrives. The full token-to-original mapping is available in memory from the request phase, so rehydration adds minimal latency to the stream.
+
+## How LLMs handle the tokens
+
+The PUA characters are valid Unicode that LLM tokenizers encode normally. The LLM doesn't know what they mean, but it treats them as opaque placeholders within the sentence structure. When it receives:
+
+```
+Summarise the case for ￰a1b2c3d4e5f6g7h8￱ (￰b2c3d4e5f6g7h8a1￱), MRN: ￰c3d4e5f6g7h8a1b2￱
+```
+
+It can still reason about the structure — there's a person, an email in brackets, and a medical record number. It just can't see the actual values. When it generates a response like "The case for ￰a1b2c3d4e5f6g7h8￱ shows...", Anonamoose replaces the tokens back to the original values on the way out.
+
+### What works well
+
+- **Summarisation, classification, sentiment analysis** — The meaning of the text doesn't depend on knowing the specific PII values, so these tasks work as normal.
+- **Entity relationships** — The LLM can still tell that one token is the person associated with another token because the sentence structure is intact.
+- **Multi-turn conversations** — Tokens are consistent within a session, so the LLM sees the same placeholder for "John Smith" every time and can track references across messages.
+- **Drafting and generation** — The LLM generates text around the tokens naturally. "Dear ￰a1b2c3d4e5f6g7h8￱, thank you for your enquiry" becomes "Dear John Smith, thank you for your enquiry" after rehydration.
+
+### What doesn't work
+
+- **Reasoning about the content of the PII itself** — For example, "what country is this phone number from?" will fail because the LLM sees a token, not digits.
+- **Spelling or formatting tasks on PII values** — "Capitalise the customer's name" won't work since the name is replaced.
+- **Calculations involving redacted numbers** — If a numeric value is redacted, the LLM can't perform arithmetic on it.
+
+These are edge cases where the task specifically requires the LLM to reason about the redacted data — which is exactly the data you don't want the LLM to have. For the vast majority of LLM use cases, the impact on response quality is negligible.
+
+## Capacity
+
+Each token uses a 16-character hex ID derived from UUID v4, giving a token space of approximately **18.4 quintillion** (16^16) unique tokens. There is no practical limit on the number of PII values that can be redacted — you will not run out of tokens.
+
+Within a single session, each unique PII value gets its own token. The same value appearing multiple times in the same session reuses the same token (deduplication). Different sessions generate independent token sets.
