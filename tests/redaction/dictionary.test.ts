@@ -246,6 +246,34 @@ describe('Dictionary Service', () => {
     });
   });
 
+  describe('removeByTerms', () => {
+    it('should remove entries by term name', async () => {
+      const dict = await makeDictionary([
+        { term: 'Alice' },
+        { term: 'Bob' },
+        { term: 'Charlie' },
+      ]);
+      const deleted = await dict.removeByTerms(['Alice', 'Charlie']);
+      expect(deleted).toEqual(['dict-0', 'dict-2']);
+      expect(dict.size()).toBe(1);
+      expect(dict.list()[0].term).toBe('Bob');
+    });
+
+    it('should match terms case-insensitively', async () => {
+      const dict = await makeDictionary([{ term: 'Alice' }]);
+      const deleted = await dict.removeByTerms(['alice']);
+      expect(deleted).toEqual(['dict-0']);
+      expect(dict.size()).toBe(0);
+    });
+
+    it('should skip terms that do not exist', async () => {
+      const dict = await makeDictionary([{ term: 'Alice' }]);
+      const deleted = await dict.removeByTerms(['Bob', 'Charlie']);
+      expect(deleted).toEqual([]);
+      expect(dict.size()).toBe(1);
+    });
+  });
+
   describe('deduplication', () => {
     it('should report existing terms via hasTerm()', async () => {
       const dict = await makeDictionary([{ term: 'Acme Corp' }]);

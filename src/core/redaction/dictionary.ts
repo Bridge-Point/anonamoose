@@ -95,6 +95,16 @@ export class DictionaryService {
     this.dirty = true;
   }
 
+  async removeByTerms(terms: string[]): Promise<string[]> {
+    const ids: string[] = [];
+    for (const term of terms) {
+      const id = this.termIndex.get(term.toLowerCase());
+      if (id) ids.push(id);
+    }
+    if (ids.length > 0) await this.remove(ids);
+    return ids;
+  }
+
   async remove(ids: string[]): Promise<void> {
     if (this.db && ids.length > 0) {
       const placeholders = ids.map(() => '?').join(',');

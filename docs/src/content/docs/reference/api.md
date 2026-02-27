@@ -161,6 +161,20 @@ Remove dictionary entries by ID.
 { "success": true }
 ```
 
+#### `DELETE /api/v1/dictionary/by-terms`
+
+Remove dictionary entries by term name (case-insensitive).
+
+**Body:**
+```json
+{ "terms": ["John Smith", "Project Falcon"] }
+```
+
+**Response:**
+```json
+{ "success": true, "deleted": 2 }
+```
+
 #### `POST /api/v1/dictionary/flush`
 
 Remove all dictionary entries.

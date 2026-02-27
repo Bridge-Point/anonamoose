@@ -512,6 +512,17 @@ export class ProxyServer {
       res.json({ success: true });
     });
 
+    api.delete('/dictionary/by-terms', async (req: Request, res: Response) => {
+      const { terms } = req.body;
+      if (!Array.isArray(terms)) {
+        res.status(400).json({ error: 'terms must be an array of strings' });
+        return;
+      }
+      const dictionary = (this.redactionPipeline as any).getDictionary() as DictionaryService;
+      const deletedIds = await dictionary.removeByTerms(terms);
+      res.json({ success: true, deleted: deletedIds.length });
+    });
+
     api.post('/dictionary/flush', async (_req: Request, res: Response) => {
       const dictionary = (this.redactionPipeline as any).getDictionary() as DictionaryService;
       const count = dictionary.size();

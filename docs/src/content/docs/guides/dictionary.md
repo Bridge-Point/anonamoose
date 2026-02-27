@@ -62,6 +62,17 @@ Returns:
 
 ## Removing terms
 
+By term name (case-insensitive):
+
+```bash
+curl -X DELETE http://localhost:3001/api/v1/dictionary/by-terms \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-token" \
+  -d '{"terms": ["John Smith", "Project Falcon"]}'
+```
+
+By ID:
+
 ```bash
 curl -X DELETE http://localhost:3001/api/v1/dictionary \
   -H "Content-Type: application/json" \
