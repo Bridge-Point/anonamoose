@@ -29,12 +29,36 @@ Pipeline settings are stored in the SQLite database and can be changed at runtim
 | `enableNames` | `true` | Enable name-list detection |
 | `nerModel` | `Xenova/bert-base-NER` | HuggingFace model ID for NER |
 | `nerMinConfidence` | `0.6` | Minimum NER confidence threshold |
-| `locale` | `null` | Regex pattern region filter (`AU`, `NZ`, `UK`, or `null` for all) |
+| `locale` | `null` | Regex pattern region filter (see [Locale](#locale) below) |
 | `tokenizePlaceholders` | `true` | Use PUA token placeholders instead of descriptive labels |
 | `placeholderPrefix` | `\uE000` | Unicode PUA prefix for tokens |
 | `placeholderSuffix` | `\uE001` | Unicode PUA suffix for tokens |
 
 Settings persist across restarts and can be modified without redeploying.
+
+## Locale
+
+The `locale` setting controls which regional regex patterns are applied. When set, only patterns tagged for that region (plus universal patterns) run. This reduces false positives from patterns that aren't relevant to your users.
+
+| Value | Patterns applied |
+|-------|-----------------|
+| `null` (default) | All patterns — AU + NZ + UK + US + universal |
+| `AU` | Australian patterns + universal |
+| `NZ` | New Zealand patterns + universal |
+| `UK` | United Kingdom patterns + universal |
+| `US` | United States patterns + universal |
+
+Universal patterns (email, credit card, IP address, URL, VIN, MAC address, IBAN, contextual MRN, contextual certificate/licence) always run regardless of locale.
+
+Set globally via the Settings API or admin panel. Can also be overridden per-request on the direct redaction endpoint:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/redact \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Call 04 1234 5678", "locale": "AU"}'
+```
+
+See [PII Patterns](/reference/pii-patterns/) for the full list of patterns per region.
 
 ## Storage
 
