@@ -1,11 +1,11 @@
 ---
 title: HIPAA Compliance
-description: How Anonamoose enables HIPAA-compliant use of LLM APIs by de-identifying Protected Health Information.
+description: How Anonamoose supports HIPAA compliance by reducing PHI exposure when using LLM APIs.
 ---
 
-HIPAA (Health Insurance Portability and Accountability Act) restricts how Protected Health Information (PHI) can be used and disclosed. Most LLM API providers do not sign Business Associate Agreements (BAAs) for standard API access, which means sending PHI to these APIs violates HIPAA.
+HIPAA (Health Insurance Portability and Accountability Act) restricts how Protected Health Information (PHI) can be used and disclosed. Most LLM API providers do not sign Business Associate Agreements (BAAs) for standard API access, which means sending PHI to these APIs creates compliance risk.
 
-Anonamoose eliminates this problem by stripping PHI from requests before they reach the LLM.
+Anonamoose significantly reduces this risk by detecting and removing PHI from requests before they reach the LLM. It is a defence-in-depth technical control — not a compliance guarantee.
 
 ## The problem
 
@@ -17,40 +17,48 @@ Healthcare organizations want to use LLMs for clinical documentation, patient co
 
 Under HIPAA §164.502, a covered entity may not disclose PHI to a third party unless specific conditions are met — typically requiring a BAA. LLM API providers generally do not offer BAAs for their standard API tiers.
 
-**Without Anonamoose:** PHI is sent directly to the LLM API, creating a HIPAA violation.
+**Without Anonamoose:** PHI is sent directly to the LLM API with no technical safeguard.
 
-**With Anonamoose:** PHI is replaced with meaningless tokens before the request leaves your network. The LLM processes de-identified data. No BAA with the LLM provider is needed because no PHI is disclosed.
+**With Anonamoose:** PHI is detected and replaced with meaningless tokens before the request leaves your network. The LLM processes de-identified data. This significantly reduces the risk of PHI disclosure, though no automated system achieves 100% detection.
 
 ## Safe Harbor de-identification
 
-HIPAA §164.514(b) defines the "Safe Harbor" method of de-identification, which requires removing 18 categories of identifiers. Anonamoose's four-layer pipeline covers these identifiers as follows:
+HIPAA §164.514(b) defines the "Safe Harbor" method of de-identification, which requires removing 18 categories of identifiers. Anonamoose's four-layer pipeline provides detection patterns for all 16 text-applicable categories:
 
-| # | Identifier | Anonamoose Coverage | Detection Method |
-|---|-----------|-------------------|-----------------|
-| 1 | Names | Covered | NER (PERSON), Names layer, Dictionary |
-| 2 | Geographic data smaller than state | Covered | Regex (postcodes, addresses), NER (LOC) |
-| 3 | Dates (except year) for ages >89 | Covered | Regex (DOB patterns for AU/NZ/UK formats) |
-| 4 | Phone numbers | Covered | Regex (AU/NZ/UK/US formats, landline + mobile) |
-| 5 | Fax numbers | Covered | Regex (same patterns as phone) |
-| 6 | Email addresses | Covered | Regex |
-| 7 | Social Security numbers | Covered | Regex (US SSN format with validation) |
-| 8 | Medical record numbers | Covered | Contextual regex (MRN, Patient ID, Chart No, etc.) |
-| 9 | Health plan beneficiary numbers | Covered | Regex (AU Medicare, NZ NHI, UK NHS with checksums) |
-| 10 | Account numbers | Covered | Regex (bank accounts — AU BSB, NZ bank, UK sort codes) |
-| 11 | Certificate/license numbers | Covered | Contextual regex (Licence/Certificate/Registration No), plus UK driving licence, AU/NZ/UK passports |
-| 12 | Vehicle identifiers | Covered | Regex (VIN with check digit validation) |
-| 13 | Device identifiers | Covered | Regex (MAC addresses), Dictionary for serial numbers |
-| 14 | Web URLs | Covered | Regex (HTTP/HTTPS URLs) |
-| 15 | IP addresses | Covered | Regex (IPv4 with octet validation, IPv6) |
-| 16 | Biometric identifiers | Not applicable | Not text-based |
-| 17 | Full-face photographs | Not applicable | Not text-based |
-| 18 | Other unique identifiers | Partial | Dictionary (add as custom terms) |
+| # | Identifier | Detection | Notes |
+|---|-----------|-----------|-------|
+| 1 | Names | NER (PERSON), Names layer, Dictionary | NER recall is ~90-95%, not 100%. Add known names to dictionary for guaranteed detection. |
+| 2 | Geographic data smaller than state | Regex (postcodes, addresses), NER (LOC) | Structured formats only. Free-text locations like "the clinic on Main" depend on NER. |
+| 3 | Dates (except year) for ages >89 | Regex (DD/MM/YYYY, DD-MM-YYYY) | Only matches structured date formats, not "March fifteenth" or similar. |
+| 4 | Phone numbers | Regex (AU/NZ/UK/US formats) | Structured formats with country codes. Does not catch "oh-four-one-two...". |
+| 5 | Fax numbers | Regex (same patterns as phone) | Same limitations as phone. |
+| 6 | Email addresses | Regex | High confidence. |
+| 7 | Social Security numbers | Regex (XXX-XX-XXXX) | Format-based only. No checksum validator — may false-positive on similar patterns. |
+| 8 | Medical record numbers | Contextual regex (MRN, Patient ID, Chart No, etc.) | Only detects when preceded by a keyword label. Unlabelled MRNs will not be caught — add known formats to dictionary. |
+| 9 | Health plan beneficiary numbers | Regex (AU Medicare, NZ NHI, UK NHS) | Checksum-validated where applicable. |
+| 10 | Account numbers | Regex (AU BSB, NZ bank, UK sort codes) | Structured formats only. |
+| 11 | Certificate/license numbers | Contextual regex (Licence/Certificate/Registration No), UK driving licence, AU/NZ/UK passports | Only detects labelled identifiers. Unlabelled licence numbers require dictionary. |
+| 12 | Vehicle identifiers | Regex (VIN with check digit) | Standard 17-character VIN only. Custom vehicle IDs require dictionary. |
+| 13 | Device identifiers | Regex (MAC addresses) | MAC addresses only. Serial numbers and UDIs require dictionary. |
+| 14 | Web URLs | Regex (HTTP/HTTPS) | High confidence. |
+| 15 | IP addresses | Regex (IPv4 with validation, IPv6) | High confidence. |
+| 16 | Biometric identifiers | Not applicable | Not text-based. |
+| 17 | Full-face photographs | Not applicable | Not text-based. |
+| 18 | Other unique identifiers | Dictionary | No automatic detection — add as custom dictionary terms. |
 
-**Summary:** All 16 applicable text-based identifiers are automatically detected. 2 identifiers (biometric data and photographs) are not applicable to text processing.
+### Important: detection is not removal
 
-### Strengthening coverage with the dictionary
+Safe Harbor requires that identifiers are *removed*. Anonamoose *detects and replaces* identifiers using pattern matching and machine learning. No automated detection system achieves 100% recall. Specifically:
 
-While all 16 text-based identifiers are automatically detected, the contextual patterns for medical record numbers and certificate/licence numbers rely on keyword labels being present (e.g. "MRN:", "Licence No:"). If your organization uses unlabelled identifiers with known formats, add them to the dictionary for guaranteed redaction:
+- **NER (names, locations, organizations)** — Runs a local transformer model with approximately 90-95% recall depending on text style. Unusual names, misspellings, and non-standard formatting reduce accuracy.
+- **Contextual patterns (MRN, licence numbers)** — Only match when a keyword label is present. `MRN: 12345678` is caught; `12345678` alone is not.
+- **Regex patterns** — Match structured formats only. Free-text representations ("oh-four-one-two", "born on the third of March") are not detected.
+
+**Anonamoose reduces PHI exposure. It does not eliminate it.** Treat it as one layer of a defence-in-depth approach, not as a standalone Safe Harbor implementation.
+
+### Maximising detection accuracy
+
+The dictionary layer provides **guaranteed** redaction — if a term is in the dictionary, it will always be caught regardless of format or context. For HIPAA use cases, populate the dictionary aggressively:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/dictionary \
@@ -59,12 +67,23 @@ curl -X POST http://localhost:3000/api/v1/dictionary \
   -d '{
     "entries": [
       { "term": "MRN-", "caseSensitive": false, "wholeWord": false },
-      { "term": "LIC-", "caseSensitive": false, "wholeWord": false }
+      { "term": "Dr Smith", "caseSensitive": false, "wholeWord": true },
+      { "term": "Mercy Hospital", "caseSensitive": false, "wholeWord": true }
     ]
   }'
 ```
 
-The dictionary layer runs first and provides guaranteed redaction — if a term is in the dictionary, it will always be caught regardless of context.
+Add:
+- All staff names (doctors, nurses, admin)
+- Facility names and department names
+- Known MRN prefixes and patient ID formats
+- Any other organization-specific identifiers
+
+The more terms in the dictionary, the closer you get to complete coverage.
+
+### Testing before production
+
+Use the **Redaction Inspector** in the admin panel to test with representative data before going live. Paste real-world examples (with consent or using test data) and verify that all PHI is being caught. If something is missed, add it to the dictionary.
 
 ## HIPAA Security Rule alignment
 
@@ -103,15 +122,20 @@ Beyond de-identification, Anonamoose's architecture supports several HIPAA Secur
 
 4. **Enable all detection layers** — Run with dictionary, NER, regex, and name detection all enabled for maximum coverage.
 
-5. **Populate the dictionary** — Add organization-specific identifiers (MRN formats, internal patient IDs, facility names) to the dictionary for guaranteed redaction.
+5. **Populate the dictionary aggressively** — Add all known staff names, facility names, MRN formats, internal patient IDs, and any other organization-specific identifiers. The dictionary is your strongest guarantee.
 
-6. **Audit regularly** — Use the admin panel's Redaction Inspector to verify that PHI is being caught. Review the request logs and recent redactions.
+6. **Test with representative data** — Use the Redaction Inspector with realistic examples before processing real PHI. Identify gaps and add dictionary terms to fill them.
 
-7. **Document your configuration** — Maintain records of which detection layers are enabled, dictionary entries, and NER confidence thresholds as part of your HIPAA compliance documentation.
+7. **Monitor in production** — Review the recent redactions log in the admin panel regularly. Look for PHI that may have been missed and add corrective dictionary entries.
+
+8. **Document your configuration** — Maintain records of which detection layers are enabled, dictionary entries, NER confidence thresholds, and testing results as part of your HIPAA compliance documentation.
 
 ## Limitations
 
-- Anonamoose processes text content only. Images, audio, and binary attachments are passed through unmodified.
-- The NER model runs locally and does not achieve 100% recall. The dictionary layer exists to guarantee redaction of known terms.
-- Anonamoose de-identifies data at the proxy layer. It does not encrypt data at rest beyond standard filesystem permissions. Use disk encryption for the SQLite database if required.
-- HIPAA compliance is an organizational responsibility. Anonamoose is a technical control that supports compliance — it does not make your organization HIPAA-compliant on its own.
+Anonamoose is a technical control that significantly reduces PHI exposure. It has inherent limitations:
+
+- **Not 100% recall.** No automated PII detection system catches everything. The NER model, regex patterns, and contextual patterns all have edge cases where PHI can pass through undetected. The dictionary layer compensates by providing guaranteed detection of known terms.
+- **Text only.** Images, audio, PDFs, and binary attachments are passed through unmodified. If your workflows involve non-text PHI, you need additional controls.
+- **Structured formats only.** Regex patterns match structured data (phone numbers, emails, dates in DD/MM/YYYY format). Free-text representations of the same information are not caught by regex — they depend on NER, which is probabilistic.
+- **No encryption at rest.** Token mappings in the SQLite database contain original PHI values. Protect this database with disk encryption and access controls.
+- **Organizational responsibility.** HIPAA compliance requires policies, training, risk assessments, incident response plans, and BAAs where applicable. Anonamoose is one technical control within a broader compliance program — it does not make your organization HIPAA-compliant on its own.
