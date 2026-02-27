@@ -43,7 +43,7 @@ Anonamoose sits between your application and upstream LLM APIs. It intercepts re
 1. **Client sends request** — Your application sends a chat completion request to Anonamoose instead of directly to OpenAI/Anthropic
 2. **Redaction** — The four-layer pipeline scans every message for PII:
    - Dictionary terms are replaced first (guaranteed)
-   - Local AI (NER) detects named entities using a transformer model
+   - Local AI (NER) detects named entities using a transformer model (long texts are automatically chunked)
    - Regex patterns catch structured PII (emails, phone numbers, etc.)
    - Name detection catches common first names from known name lists
 3. **Tokenization** — Each detected PII value is replaced with a Unicode Private Use Area token (e.g. `\ue000a1b2c3d4\ue001`)

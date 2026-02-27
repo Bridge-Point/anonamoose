@@ -91,14 +91,18 @@ describe('NER Layer (Transformer)', () => {
     expect(result.text).toBe('The quick brown fox jumps over the lazy dog');
   }, 30000);
 
-  it('should skip text exceeding MAX_INPUT_LENGTH', async () => {
-    const longText = 'A'.repeat(10_001);
+  it('should handle long text via chunking instead of skipping', async () => {
+    // Build text longer than CHUNK_SIZE (1000 chars) with a name at the end
+    const padding = 'The quick brown fox jumps over the lazy dog. '.repeat(30); // ~1350 chars
+    const longText = padding + 'Please contact Sarah Johnson about this matter.';
+    expect(longText.length).toBeGreaterThan(1000);
+
     const result = await nerLayer.redact(longText);
 
-    expect(result.text).toBe(longText);
-    expect(result.detections).toHaveLength(0);
-    expect(result.tokens.size).toBe(0);
-  });
+    // Should still detect the name even though it's past the chunk boundary
+    const personDetections = result.detections.filter(d => d.category === 'PERSON');
+    expect(personDetections.length).toBeGreaterThanOrEqual(1);
+  }, 30000);
 
   it('should reset internal counter', () => {
     const layer = new NERLayer();
@@ -131,6 +135,62 @@ describe('NER Layer (Transformer)', () => {
       (NERLayer as any).loadFailed = origFailed;
       (NERLayer as any).lastLoadAttempt = origLastAttempt;
     }
+  });
+});
+
+describe('NER chunkText (unit)', () => {
+  it('should return single chunk for short text', () => {
+    const chunks = NERLayer.chunkText('Hello world', 1000, 200);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toEqual({ chunk: 'Hello world', offset: 0 });
+  });
+
+  it('should split long text into overlapping chunks', () => {
+    const text = 'A'.repeat(2000);
+    const chunks = NERLayer.chunkText(text, 1000, 200);
+
+    // 2000 chars, chunk size 1000, overlap 200 → step 800
+    // Chunk 0: [0, 1000), Chunk 1: [800, 1800), Chunk 2: [1600, 2000)
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0].offset).toBe(0);
+    expect(chunks[0].chunk.length).toBe(1000);
+    expect(chunks[1].offset).toBe(800);
+    expect(chunks[1].chunk.length).toBe(1000);
+    expect(chunks[2].offset).toBe(1600);
+    expect(chunks[2].chunk.length).toBe(400);
+  });
+
+  it('should cover the entire text with no gaps', () => {
+    const text = 'X'.repeat(3500);
+    const chunks = NERLayer.chunkText(text, 1000, 200);
+
+    // Every character position should be covered by at least one chunk
+    const covered = new Set<number>();
+    for (const { offset, chunk } of chunks) {
+      for (let i = 0; i < chunk.length; i++) {
+        covered.add(offset + i);
+      }
+    }
+    expect(covered.size).toBe(3500);
+  });
+
+  it('should have overlap between adjacent chunks', () => {
+    const text = 'B'.repeat(2500);
+    const chunks = NERLayer.chunkText(text, 1000, 200);
+
+    for (let i = 1; i < chunks.length; i++) {
+      const prevEnd = chunks[i - 1].offset + chunks[i - 1].chunk.length;
+      const currStart = chunks[i].offset;
+      // Current chunk should start before previous chunk ends (overlap)
+      expect(currStart).toBeLessThan(prevEnd);
+    }
+  });
+
+  it('should handle text exactly at chunk size boundary', () => {
+    const text = 'C'.repeat(1000);
+    const chunks = NERLayer.chunkText(text, 1000, 200);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].chunk).toBe(text);
   });
 });
 

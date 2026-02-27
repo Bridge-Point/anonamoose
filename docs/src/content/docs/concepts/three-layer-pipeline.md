@@ -36,6 +36,7 @@ The NER (Named Entity Recognition) layer uses transformer-based models (`bert-ba
 - Detects: `PER` (person), `ORG` (organization), `LOC` (location), `MISC`
 - Model is configurable at runtime via the Settings API (`nerModel` setting)
 - Confidence threshold is configurable (`nerMinConfidence`, default 0.6)
+- **No input length limit** — long texts are automatically split into overlapping chunks (1,000 chars with 200 char overlap) so BERT's 512-token context window is used optimally. Entities near chunk boundaries are caught via the overlap zone.
 - Loads lazily on first request
 - Deduplicates against existing detections
 

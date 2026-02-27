@@ -49,7 +49,8 @@ export class NERLayer {
   private static loadFailed = false;
   private static lastLoadAttempt = 0;
   private static readonly RETRY_INTERVAL_MS = 60_000;
-  private static readonly MAX_INPUT_LENGTH = 10_000;
+  private static readonly CHUNK_SIZE = 1_000;
+  private static readonly CHUNK_OVERLAP = 200;
   private config: NERConfig;
   private tokenizer: (text: string) => string;
   private counter = 0;
@@ -100,26 +101,29 @@ export class NERLayer {
     const detections: PIIDetection[] = [];
     const confidence = minConfidence ?? this.config.minConfidence;
 
-    if (text.length > NERLayer.MAX_INPUT_LENGTH) {
-      return { text, tokens, detections };
-    }
-
     const ner = await NERLayer.getPipeline(modelName);
     if (!ner) {
       return { text, tokens, detections };
     }
-    const rawEntities = await ner(text, { ignore_labels: [] }) as RawEntity[];
 
-    // Filter to B-/I- tags only (skip 'O' labels)
-    const bioEntities = rawEntities.filter(
-      (e) => e.entity.startsWith('B-') || e.entity.startsWith('I-')
-    );
+    // Chunk text to stay within BERT's ~512 token context window
+    const chunks = NERLayer.chunkText(text, NERLayer.CHUNK_SIZE, NERLayer.CHUNK_OVERLAP);
+    const allMerged: MergedEntity[] = [];
 
-    // Merge subword tokens into full entity spans
-    const merged = NERLayer.mergeEntities(bioEntities);
+    for (const { chunk } of chunks) {
+      const rawEntities = await ner(chunk, { ignore_labels: [] }) as RawEntity[];
 
-    // Deduplicate entity words
-    const uniqueEntities = [...new Map(merged.map(e => [e.word, e])).values()];
+      // Filter to B-/I- tags only (skip 'O' labels)
+      const bioEntities = rawEntities.filter(
+        (e) => e.entity.startsWith('B-') || e.entity.startsWith('I-')
+      );
+
+      // Merge subword tokens into full entity spans
+      allMerged.push(...NERLayer.mergeEntities(bioEntities));
+    }
+
+    // Deduplicate entity words across chunks (overlap zone may detect the same entity twice)
+    const uniqueEntities = [...new Map(allMerged.map(e => [e.word, e])).values()];
 
     // Filter by confidence and allowed entity types
     const filtered = uniqueEntities.filter(
@@ -156,10 +160,22 @@ export class NERLayer {
       }
     }
 
-    // Replace entities in text (process right-to-left to preserve indices)
-    const sortedDetections = detections.sort((a, b) => b.startIndex - a.startIndex);
+    // Remove overlapping detections — keep the longest match
+    const sorted = detections.sort((a, b) => a.startIndex - b.startIndex || b.endIndex - a.endIndex);
+    const nonOverlapping: PIIDetection[] = [];
+    let lastEnd = -1;
 
-    for (const detection of sortedDetections) {
+    for (const d of sorted) {
+      if (d.startIndex >= lastEnd) {
+        nonOverlapping.push(d);
+        lastEnd = d.endIndex;
+      }
+    }
+
+    // Replace right-to-left to preserve indices
+    const replacements = nonOverlapping.sort((a, b) => b.startIndex - a.startIndex);
+
+    for (const detection of replacements) {
       const token = [...tokens.entries()].find(([, v]) => v === detection.value)?.[0];
       if (token) {
         result =
@@ -169,7 +185,27 @@ export class NERLayer {
       }
     }
 
-    return { text: result, tokens, detections };
+    return { text: result, tokens, detections: nonOverlapping };
+  }
+
+  /** @internal Split text into overlapping chunks for NER processing */
+  static chunkText(text: string, chunkSize: number, overlap: number): { chunk: string; offset: number }[] {
+    if (text.length <= chunkSize) {
+      return [{ chunk: text, offset: 0 }];
+    }
+
+    const chunks: { chunk: string; offset: number }[] = [];
+    let start = 0;
+
+    while (start < text.length) {
+      const end = Math.min(start + chunkSize, text.length);
+      chunks.push({ chunk: text.slice(start, end), offset: start });
+
+      if (end >= text.length) break;
+      start += chunkSize - overlap;
+    }
+
+    return chunks;
   }
 
   /** @internal Exposed as static for testing */

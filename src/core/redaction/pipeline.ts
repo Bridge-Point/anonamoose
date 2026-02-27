@@ -112,9 +112,15 @@ export class RedactionPipeline {
       for (const match of matches) {
         const value = match[0];
 
-        if (pattern.validator && !pattern.validator(value)) {
-          continue;
+        let valid = true;
+        if (pattern.validator) {
+          try {
+            valid = pattern.validator(value);
+          } catch {
+            valid = false;
+          }
         }
+        if (!valid) continue;
 
         const token = this.tokenizer.generatePlaceholder();
 
@@ -133,10 +139,26 @@ export class RedactionPipeline {
       }
     }
 
-    const sortedDetections = detections.sort((a, b) => b.startIndex - a.startIndex);
+    // Remove overlapping detections — keep the longest (or highest confidence) match
+    const sorted = detections.sort((a, b) => a.startIndex - b.startIndex || b.endIndex - a.endIndex);
+    const nonOverlapping: PIIDetection[] = [];
+    let lastEnd = -1;
+
+    for (const d of sorted) {
+      if (d.startIndex >= lastEnd) {
+        nonOverlapping.push(d);
+        lastEnd = d.endIndex;
+      } else if (d.endIndex > lastEnd) {
+        // Overlapping but extends further — keep the one already in the list
+        // (it started earlier, so it's likely the more complete match)
+      }
+    }
+
+    // Replace right-to-left to preserve indices
+    const replacements = nonOverlapping.sort((a, b) => b.startIndex - a.startIndex);
     let result = text;
 
-    for (const detection of sortedDetections) {
+    for (const detection of replacements) {
       const token = [...tokens.entries()].find(([, v]) => v === detection.value)?.[0];
       if (token) {
         result =
@@ -146,7 +168,7 @@ export class RedactionPipeline {
       }
     }
 
-    return { text: result, tokens, detections };
+    return { text: result, tokens, detections: nonOverlapping };
   }
 
   getDictionary(): DictionaryService {

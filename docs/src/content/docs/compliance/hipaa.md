@@ -50,7 +50,7 @@ HIPAA §164.514(b) defines the "Safe Harbor" method of de-identification, which 
 
 Safe Harbor requires that identifiers are *removed*. Anonamoose *detects and replaces* identifiers using pattern matching and machine learning. No automated detection system achieves 100% recall. Specifically:
 
-- **NER (names, locations, organizations)** — Runs a local transformer model with approximately 90-95% recall depending on text style. Unusual names, misspellings, and non-standard formatting reduce accuracy.
+- **NER (names, locations, organizations)** — Runs a local transformer model with approximately 90-95% recall depending on text style. Long texts are automatically chunked with overlap so there is no input length limit. Unusual names, misspellings, and non-standard formatting reduce accuracy.
 - **Contextual patterns (MRN, licence numbers)** — Only match when a keyword label is present. `MRN: 12345678` is caught; `12345678` alone is not.
 - **Regex patterns** — Match structured formats only. Free-text representations ("oh-four-one-two", "born on the third of March") are not detected.
 
