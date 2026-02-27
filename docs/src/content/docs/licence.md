@@ -46,4 +46,4 @@ Commercial licences are available from Bridge Point Ltd. Contact [ben@bridgepoin
 The complete licence text is in the [LICENSE](https://github.com/Bridge-Point/anonamoose/blob/main/LICENSE) file in the repository.
 
 **Licensor:** Bridge Point Ltd
-**Licensed Work:** Anonamoose 1.0.0 — (c) 2024 Bridge Point Ltd.
+**Licensed Work:** Anonamoose 1.0.0 — (c) 2026 Bridge Point Ltd.

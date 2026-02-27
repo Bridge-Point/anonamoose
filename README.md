@@ -163,7 +163,7 @@ Full documentation at [docs.anonamoose.net](https://docs.anonamoose.net).
 
 ## License
 
-[Business Source License 1.1](./LICENSE) — (c) 2024 Bridge Point Ltd.
+[Business Source License 1.1](./LICENSE) — (c) 2026 Bridge Point Ltd.
 
 **Non-commercial use is permitted.** You may use, copy, modify, and redistribute Anonamoose for personal projects, research, education, and internal evaluation.
 
