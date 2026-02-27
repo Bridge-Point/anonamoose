@@ -5,7 +5,7 @@ description: Deploy Anonamoose with Docker Compose for production use.
 
 ## Docker Compose (recommended)
 
-The Docker Compose setup runs Anonamoose and the admin panel as a single stack.
+A single container runs the proxy, management API, and admin panel.
 
 ### Setup
 
@@ -23,25 +23,14 @@ docker-compose up -d
 
 The compose file is at the project root (`docker-compose.yaml`).
 
-### Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| `anonamoose` | 3000 | Proxy server + management API |
-| `ui` | 3002 | Dashboard and admin panel |
-
-### Health checks
-
-Both services have health checks configured:
+### Health check
 
 - **Anonamoose**: `GET /health` every 5s
-- **UI**: HTTP check on port 3002 every 5s
 
 ### Volumes
 
 | Volume | Purpose |
 |--------|---------|
-| `dictionary-data` | Persisted dictionary data |
 | `db-data` | SQLite database persistence |
 
 ### Stopping
@@ -60,14 +49,11 @@ docker-compose down -v
 
 Anonamoose supports deployment on [Coolify](https://coolify.io/) as a Docker Compose stack. Coolify expects `docker-compose.yaml` (not `.yml`). The compose file uses Coolify magic variables for automatic FQDN routing:
 
-- `SERVICE_FQDN_ANONAMOOSE_3000` — public URL for the proxy
-- `SERVICE_FQDN_UI_3002` — public URL for the dashboard
+- `SERVICE_FQDN_ANONAMOOSE_3000` — public URL for the proxy and admin panel
 
 Set `API_TOKEN` in the Coolify service environment variables.
 
 ## Single container
-
-For simpler deployments without the dashboard:
 
 ```bash
 docker build -t anonamoose -f docker/Dockerfile .

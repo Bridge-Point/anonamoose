@@ -1,5 +1,5 @@
 # Local development docker-compose
-# For Coolify deployment, use the root docker-compose.yml instead
+# For Coolify deployment, use the root docker-compose.yaml instead
 
 services:
   anonamoose:
@@ -7,61 +7,21 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "${PROXY_PORT:-3100}:3000"
-      - "${MGMT_PORT:-3101}:3001"
+      - "${PROXY_PORT:-3000}:3000"
     env_file:
       - ../.env
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - MGMT_PORT=3001
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-anonamoose}@redis:6379
-    depends_on:
-      redis:
-        condition: service_healthy
+      - ANONAMOOSE_DB_PATH=/app/data/anonamoose.db
     volumes:
-      - dictionary-data:/app/data
-    networks:
-      - frontend
-      - backend
+      - db-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)throw r;process.exit(0)}).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  redis:
-    image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD:-anonamoose}
-    volumes:
-      - redis-data:/data
-    networks:
-      - backend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-anonamoose}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  ui:
-    build:
-      context: ../ui
-      dockerfile: Dockerfile
-    ports:
-      - "${UI_PORT:-3102}:3002"
-    environment:
-      - API_URL=http://anonamoose:3000
-      - STATS_TOKEN=${STATS_TOKEN}
-    networks:
-      - frontend
-    restart: unless-stopped
-
 volumes:
-  dictionary-data:
-  redis-data:
-
-networks:
-  frontend:
-  backend:
+  db-data:

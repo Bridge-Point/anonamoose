@@ -55,12 +55,7 @@ Docker Compose brings up Anonamoose and the admin panel together:
 docker-compose up -d
 ```
 
-This starts three services:
-
-| Service | Port | Description |
-|---------|------|-------------|
-| `anonamoose` | 3000 | Proxy server + management API |
-| `ui` | 3002 | Dashboard and admin panel |
+This starts a single container with the proxy, management API, and admin panel on port 3000.
 
 Create a `.env` file in the project root before running:
 
