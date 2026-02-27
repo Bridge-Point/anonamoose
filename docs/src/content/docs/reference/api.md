@@ -51,8 +51,16 @@ Direct redaction without proxying to an LLM.
 
 **Body:**
 ```json
-{ "text": "string to redact" }
+{
+  "text": "string to redact",
+  "locale": "AU"
+}
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `text` | string | Yes | The text to redact (max 100,000 chars) |
+| `locale` | string \| null | No | Override the global locale for this request. One of `AU`, `NZ`, `UK`, `US`, or `null` for all regions. If omitted, uses the global setting. |
 
 **Response:**
 ```json

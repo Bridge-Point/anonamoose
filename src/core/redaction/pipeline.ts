@@ -27,8 +27,8 @@ export class RedactionPipeline {
     });
   }
 
-  async redact(text: string, sessionId: string): Promise<RedactionResult> {
-    const config = this.getConfig();
+  async redact(text: string, sessionId: string, overrides?: Partial<RedactionConfig>): Promise<RedactionResult> {
+    const config = { ...this.getConfig(), ...overrides };
     const tokens = new Map<string, string>();
     const detections: PIIDetection[] = [];
     let result = text;

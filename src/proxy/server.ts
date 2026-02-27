@@ -783,7 +783,7 @@ export class ProxyServer {
 
   private async handleRedact(req: Request, res: Response): Promise<void> {
     const sessionId = this.getSessionId(req);
-    const { text } = req.body;
+    const { text, locale } = req.body;
 
     if (!text || typeof text !== 'string') {
       res.status(400).json({ error: 'text must be a non-empty string' });
@@ -795,7 +795,14 @@ export class ProxyServer {
       return;
     }
 
-    const result = await this.redactionPipeline.redact(text, sessionId);
+    const validLocales = ['AU', 'NZ', 'UK', 'US'];
+    if (locale !== undefined && locale !== null && !validLocales.includes(locale)) {
+      res.status(400).json({ error: `Invalid locale. Must be one of: ${validLocales.join(', ')}` });
+      return;
+    }
+
+    const overrides = locale !== undefined ? { locale: locale || null } : undefined;
+    const result = await this.redactionPipeline.redact(text, sessionId, overrides);
     this.storeTokens(sessionId, result.tokens);
 
     // Group tokens by type for deduplication
