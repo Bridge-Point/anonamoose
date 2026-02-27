@@ -45,6 +45,12 @@
   padding-block: 0;
 }
 
+/* Bigger nav logo */
+.site-title img {
+  height: 2.5rem;
+  width: auto;
+}
+
 /* Tighter card grid */
 .card-grid {
   gap: 1rem;
