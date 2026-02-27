@@ -41,10 +41,6 @@ If your use of Anonamoose is connected to business activity of any kind, you nee
 
 Commercial licences are available from Bridge Point Ltd. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz) for pricing and terms.
 
-## Change date
-
-On **23 February 2030**, the licence automatically converts to [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). After this date, all use — including commercial — is permitted under the Apache 2.0 terms.
-
 ## Full licence text
 
 The complete licence text is in the [LICENSE](https://github.com/Bridge-Point/anonamoose/blob/main/LICENSE) file in the repository.

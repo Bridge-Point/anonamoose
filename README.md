@@ -3,7 +3,7 @@
 [![CI](https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml/badge.svg)](https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml)
 [![Coverage](https://bridge-point.github.io/anonamoose/coverage/badge.svg)](https://bridge-point.github.io/anonamoose/coverage/)
 
-> **License:** Anonamoose is licensed under [Business Source License 1.1](./LICENSE). Free for personal projects and non-commercial use. Commercial use (including offering as a hosted service) requires a commercial license. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz). On 2030-02-23, the license converts to [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+> **License:** Anonamoose is licensed under [Business Source License 1.1](./LICENSE). Free for personal projects and non-commercial use. Commercial use (including offering as a hosted service) requires a commercial license. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz).
 
 **A drop-in proxy that strips PII from LLM requests before they leave your network.**
 
@@ -157,5 +157,3 @@ Full documentation at [docs.anonamoose.net](https://docs.anonamoose.net).
 **Commercial use requires a license.** If you or your organisation are using Anonamoose to generate revenue, provide services to customers, or operate as part of a business (including not-for-profits and offering it as a hosted service), you need a commercial license.
 
 Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz) for commercial licensing.
-
-On **2030-02-23**, the license automatically converts to [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
