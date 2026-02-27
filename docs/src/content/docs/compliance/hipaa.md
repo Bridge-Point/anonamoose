@@ -38,19 +38,19 @@ HIPAA §164.514(b) defines the "Safe Harbor" method of de-identification, which 
 | 9 | Health plan beneficiary numbers | Covered | Regex (AU Medicare, NZ NHI, UK NHS with checksums) |
 | 10 | Account numbers | Covered | Regex (bank accounts — AU BSB, NZ bank, UK sort codes) |
 | 11 | Certificate/license numbers | Partial | Regex (UK driving licence, AU/NZ/UK passports), Dictionary for others |
-| 12 | Vehicle identifiers | Partial | Dictionary (add as custom terms) |
-| 13 | Device identifiers | Partial | Dictionary (add as custom terms) |
-| 14 | Web URLs | Partial | Dictionary (add as custom terms) |
-| 15 | IP addresses | Covered | Regex |
+| 12 | Vehicle identifiers | Covered | Regex (VIN with check digit validation) |
+| 13 | Device identifiers | Covered | Regex (MAC addresses), Dictionary for serial numbers |
+| 14 | Web URLs | Covered | Regex (HTTP/HTTPS URLs) |
+| 15 | IP addresses | Covered | Regex (IPv4 with octet validation, IPv6) |
 | 16 | Biometric identifiers | Not applicable | Not text-based |
 | 17 | Full-face photographs | Not applicable | Not text-based |
 | 18 | Other unique identifiers | Partial | Dictionary (add as custom terms) |
 
-**Summary:** 11 of 18 identifiers are automatically detected. 5 can be covered by adding organization-specific formats to the dictionary. 2 are not applicable to text processing.
+**Summary:** 14 of 18 identifiers are automatically detected. 2 can be covered by adding organization-specific formats to the dictionary. 2 are not applicable to text processing.
 
 ### Closing the gaps
 
-For identifiers marked "Partial", add your organization's specific formats to the dictionary for guaranteed redaction:
+For the two identifiers marked "Partial" (medical record numbers and certificate/license numbers), add your organization's specific formats to the dictionary for guaranteed redaction:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/dictionary \
@@ -59,7 +59,7 @@ curl -X POST http://localhost:3000/api/v1/dictionary \
   -d '{
     "entries": [
       { "term": "MRN-", "caseSensitive": false, "wholeWord": false },
-      { "term": "https://", "caseSensitive": false, "wholeWord": false }
+      { "term": "LIC-", "caseSensitive": false, "wholeWord": false }
     ]
   }'
 ```

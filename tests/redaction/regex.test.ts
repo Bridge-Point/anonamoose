@@ -305,15 +305,138 @@ describe('Regex Layer - Pattern Detection', () => {
     });
   });
 
-  describe('IP Address', () => {
+  describe('IP Address (IPv4)', () => {
     const ip = findPattern('ip-address');
 
-    it('should detect IP addresses', () => {
+    it('should detect valid IPv4 addresses', () => {
+      const addresses = ['192.168.1.100', '10.0.0.1', '255.255.255.0', '0.0.0.0'];
+      for (const addr of addresses) {
+        ip.pattern.lastIndex = 0;
+        expect(addr.match(ip.pattern), `should match: ${addr}`).not.toBeNull();
+      }
+    });
+
+    it('should find IPv4 in context', () => {
       ip.pattern.lastIndex = 0;
       const text = 'Server at 192.168.1.100 responded';
       const matches = text.match(ip.pattern);
       expect(matches).not.toBeNull();
       expect(matches![0]).toBe('192.168.1.100');
+    });
+
+    it('should validate octet range', () => {
+      expect(ip.validator).toBeDefined();
+      expect(ip.validator!('192.168.1.100')).toBe(true);
+      expect(ip.validator!('0.0.0.0')).toBe(true);
+      expect(ip.validator!('255.255.255.255')).toBe(true);
+      expect(ip.validator!('999.999.999.999')).toBe(false);
+      expect(ip.validator!('256.1.1.1')).toBe(false);
+    });
+  });
+
+  describe('IP Address (IPv6)', () => {
+    const ipv6 = findPattern('ipv6-address');
+
+    it('should detect full IPv6 addresses', () => {
+      ipv6.pattern.lastIndex = 0;
+      const text = 'Host: 2001:0db8:85a3:0000:0000:8a2e:0370:7334';
+      expect(text.match(ipv6.pattern)).not.toBeNull();
+    });
+
+    it('should detect loopback ::1', () => {
+      ipv6.pattern.lastIndex = 0;
+      expect('::1'.match(ipv6.pattern)).not.toBeNull();
+    });
+
+    it('should detect link-local fe80::1', () => {
+      ipv6.pattern.lastIndex = 0;
+      expect('fe80::1'.match(ipv6.pattern)).not.toBeNull();
+    });
+  });
+
+  describe('URL', () => {
+    const url = findPattern('url');
+
+    it('should detect HTTP and HTTPS URLs', () => {
+      const urls = [
+        'https://example.com',
+        'http://example.com/path',
+        'https://sub.domain.co.nz/page?q=test',
+        'https://example.com/path/to/resource#anchor',
+      ];
+      for (const u of urls) {
+        url.pattern.lastIndex = 0;
+        expect(u.match(url.pattern), `should match: ${u}`).not.toBeNull();
+      }
+    });
+
+    it('should find URLs in context', () => {
+      url.pattern.lastIndex = 0;
+      const text = 'Visit https://example.com/page for details';
+      const matches = text.match(url.pattern);
+      expect(matches).not.toBeNull();
+      expect(matches![0]).toBe('https://example.com/page');
+    });
+
+    it('should not match non-URL text', () => {
+      url.pattern.lastIndex = 0;
+      expect('just some text'.match(url.pattern)).toBeNull();
+    });
+  });
+
+  describe('VIN (Vehicle Identification Number)', () => {
+    const vin = findPattern('vin');
+
+    it('should match 17-character VIN format', () => {
+      vin.pattern.lastIndex = 0;
+      // 1HGBH41JXMN109186 is a well-known valid VIN
+      const text = 'VIN: 1HGBH41JXMN109186';
+      expect(text.match(vin.pattern)).not.toBeNull();
+    });
+
+    it('should reject VINs with I, O, Q', () => {
+      vin.pattern.lastIndex = 0;
+      expect('IHGBH41JXMN109186'.match(vin.pattern)).toBeNull();
+    });
+
+    it('should have a check digit validator', () => {
+      expect(vin.validator).toBeDefined();
+      // 1HGBH41JXMN109186 — check digit is X at position 9
+      expect(vin.validator!('1HGBH41JXMN109186')).toBe(true);
+    });
+
+    it('should reject invalid check digits', () => {
+      // Change the check digit (position 9) from X to 0
+      expect(vin.validator!('1HGBH41J0MN109186')).toBe(false);
+    });
+
+    it('should reject wrong length', () => {
+      expect(vin.validator!('1HGBH41JX')).toBe(false);
+    });
+  });
+
+  describe('MAC Address', () => {
+    const mac = findPattern('mac-address');
+
+    it('should detect colon-separated MAC addresses', () => {
+      const macs = ['00:1A:2B:3C:4D:5E', 'aa:bb:cc:dd:ee:ff'];
+      for (const m of macs) {
+        mac.pattern.lastIndex = 0;
+        expect(m.match(mac.pattern), `should match: ${m}`).not.toBeNull();
+      }
+    });
+
+    it('should detect hyphen-separated MAC addresses', () => {
+      mac.pattern.lastIndex = 0;
+      expect('00-1A-2B-3C-4D-5E'.match(mac.pattern)).not.toBeNull();
+    });
+
+    it('should find MAC in context', () => {
+      mac.pattern.lastIndex = 0;
+      const text = 'Device MAC: 00:1A:2B:3C:4D:5E connected';
+      const matches = text.match(mac.pattern);
+      expect(matches).not.toBeNull();
+      expect(matches![0]).toBe('00:1A:2B:3C:4D:5E');
     });
   });
 

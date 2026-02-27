@@ -15,7 +15,11 @@ These patterns always run regardless of locale setting.
 |---------|----|-----------|-----------|
 | Email | `email` | 0.95 | — |
 | Credit Card | `credit-card` | 0.95 | Luhn checksum |
-| IP Address | `ip-address` | 0.85 | — |
+| IP Address (IPv4) | `ip-address` | 0.90 | Octet range validation (0-255) |
+| IP Address (IPv6) | `ipv6-address` | 0.90 | — |
+| URL | `url` | 0.95 | — |
+| VIN (Vehicle Identification Number) | `vin` | 0.95 | Check digit validation (position 9) |
+| MAC Address | `mac-address` | 0.92 | — |
 | IBAN | `iban` | 0.95 | — |
 
 ## Australia
@@ -110,6 +114,32 @@ NHS numbers are 10 digits validated using a modulus 11 algorithm with weights `[
 | SSN (Social Security Number) | `ssn-us` | 0.90 | — |
 
 US patterns are tagged with the `US` locale. When no locale is set, they run alongside all other regional patterns.
+
+## Universal pattern details
+
+### IP Address validation
+
+**IPv4** addresses are validated to ensure each octet is in the range 0-255. The pattern `999.999.999.999` would be matched by the regex but rejected by the validator.
+
+**IPv6** addresses match full (`2001:0db8:...`), abbreviated (`fe80::1`, `::1`), and other standard forms.
+
+### URL detection
+
+Matches `http://` and `https://` URLs including paths, query strings, and fragments. Stops at whitespace and common delimiters (`"`, `'`, `>`, `)`, `]`).
+
+### VIN validation
+
+Vehicle Identification Numbers are exactly 17 characters, using alphanumeric characters excluding I, O, and Q. The check digit at position 9 is validated using the standard transliteration and weighting algorithm:
+
+- Characters are transliterated to numeric values (A=1, B=2, ..., excluding I, O, Q)
+- Position weights: `[8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2]`
+- The weighted sum modulo 11 must equal the check digit (0-9 or X for 10)
+
+This validation eliminates false positives from random 17-character strings.
+
+### MAC Address detection
+
+Matches MAC addresses in both colon-separated (`00:1A:2B:3C:4D:5E`) and hyphen-separated (`00-1A-2B-3C-4D-5E`) formats. Each octet is exactly 2 hex digits.
 
 ## Confidence scores
 
