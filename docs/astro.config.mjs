@@ -6,6 +6,10 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Anonamoose',
+      logo: {
+        src: './src/assets/logo.png',
+        replacesTitle: true,
+      },
       description: 'LLM Anonymization Proxy — Guaranteed PII Redaction with Rehydration',
       social: {
         github: 'https://github.com/Bridge-Point/anonamoose',
