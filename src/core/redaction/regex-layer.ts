@@ -465,4 +465,19 @@ export const DEFAULT_PATTERNS: RegexPattern[] = [
     country: ['NZ']
   },
 
+  // Contextual: Medical Record Numbers (keyword + identifier)
+  {
+    id: 'medical-record-number',
+    name: 'MEDICAL_RECORD_NUMBER',
+    pattern: /(?:MRN|Medical Record|Patient ID|Patient No|Chart No|Record No|Hospital No|Health Record|UR No|URN|Unit Record)[:\s#\-./]*[A-Z0-9][-A-Z0-9]{2,}/gi,
+    confidence: 0.90
+  },
+
+  // Contextual: Certificate and Licence Numbers (keyword + identifier)
+  {
+    id: 'certificate-licence-number',
+    name: 'CERTIFICATE_LICENCE_NUMBER',
+    pattern: /(?:Licen[cs]e|Certificate|Registration|Accreditation|Permit)\s*(?:No|Number|Num|#|ID)[:\s#\-./]*[A-Z0-9][-A-Z0-9]{2,}/gi,
+    confidence: 0.88
+  },
 ];

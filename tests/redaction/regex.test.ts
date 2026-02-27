@@ -659,6 +659,89 @@ describe('Regex Layer - Pattern Detection', () => {
     });
   });
 
+  describe('Medical Record Number (contextual)', () => {
+    const mrn = findPattern('medical-record-number');
+
+    it('should detect MRN with various labels', () => {
+      const cases = [
+        'MRN: 12345678',
+        'MRN-ABC123',
+        'Medical Record: M-987654',
+        'Patient ID: P12345',
+        'Patient No: 00112233',
+        'Chart No: CH-44556',
+        'Record No: REC-789',
+        'Hospital No: H123456',
+        'UR No: 1234567',
+        'URN: U-9876',
+      ];
+      for (const c of cases) {
+        mrn.pattern.lastIndex = 0;
+        expect(c.match(mrn.pattern), `should match: ${c}`).not.toBeNull();
+      }
+    });
+
+    it('should find MRN in context', () => {
+      mrn.pattern.lastIndex = 0;
+      const text = 'Admit patient with MRN: ABC-12345 to ward 3';
+      const matches = text.match(mrn.pattern);
+      expect(matches).not.toBeNull();
+    });
+
+    it('should not match without a keyword', () => {
+      mrn.pattern.lastIndex = 0;
+      expect('just 12345678'.match(mrn.pattern)).toBeNull();
+    });
+
+    it('should have no country tag (universal)', () => {
+      expect(mrn.country).toBeUndefined();
+    });
+  });
+
+  describe('Certificate/Licence Number (contextual)', () => {
+    const cert = findPattern('certificate-licence-number');
+
+    it('should detect licence numbers with various labels', () => {
+      const cases = [
+        'License No: DL-987654',
+        'Licence Number: ABC123456',
+        'Certificate No: CERT-789',
+        'Registration No: REG-00123',
+        'Accreditation Number: ACC-456',
+        'Permit No: P-12345',
+        'License #: LIC-99887',
+        'Certificate ID: C-55443',
+      ];
+      for (const c of cases) {
+        cert.pattern.lastIndex = 0;
+        expect(c.match(cert.pattern), `should match: ${c}`).not.toBeNull();
+      }
+    });
+
+    it('should handle both US and UK spelling', () => {
+      cert.pattern.lastIndex = 0;
+      expect('License No: A123'.match(cert.pattern)).not.toBeNull();
+      cert.pattern.lastIndex = 0;
+      expect('Licence No: A123'.match(cert.pattern)).not.toBeNull();
+    });
+
+    it('should find in context', () => {
+      cert.pattern.lastIndex = 0;
+      const text = 'Driver holds Licence No: DL-123456 issued 2020';
+      const matches = text.match(cert.pattern);
+      expect(matches).not.toBeNull();
+    });
+
+    it('should not match without a keyword', () => {
+      cert.pattern.lastIndex = 0;
+      expect('just DL-987654'.match(cert.pattern)).toBeNull();
+    });
+
+    it('should have no country tag (universal)', () => {
+      expect(cert.country).toBeUndefined();
+    });
+  });
+
   describe('Pattern metadata', () => {
     it('should have confidence between 0 and 1 for all patterns', () => {
       for (const p of DEFAULT_PATTERNS) {

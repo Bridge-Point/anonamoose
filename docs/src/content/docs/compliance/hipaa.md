@@ -34,10 +34,10 @@ HIPAA §164.514(b) defines the "Safe Harbor" method of de-identification, which 
 | 5 | Fax numbers | Covered | Regex (same patterns as phone) |
 | 6 | Email addresses | Covered | Regex |
 | 7 | Social Security numbers | Covered | Regex (US SSN format with validation) |
-| 8 | Medical record numbers | Partial | Dictionary (add known formats as custom terms) |
+| 8 | Medical record numbers | Covered | Contextual regex (MRN, Patient ID, Chart No, etc.) |
 | 9 | Health plan beneficiary numbers | Covered | Regex (AU Medicare, NZ NHI, UK NHS with checksums) |
 | 10 | Account numbers | Covered | Regex (bank accounts — AU BSB, NZ bank, UK sort codes) |
-| 11 | Certificate/license numbers | Partial | Regex (UK driving licence, AU/NZ/UK passports), Dictionary for others |
+| 11 | Certificate/license numbers | Covered | Contextual regex (Licence/Certificate/Registration No), plus UK driving licence, AU/NZ/UK passports |
 | 12 | Vehicle identifiers | Covered | Regex (VIN with check digit validation) |
 | 13 | Device identifiers | Covered | Regex (MAC addresses), Dictionary for serial numbers |
 | 14 | Web URLs | Covered | Regex (HTTP/HTTPS URLs) |
@@ -46,11 +46,11 @@ HIPAA §164.514(b) defines the "Safe Harbor" method of de-identification, which 
 | 17 | Full-face photographs | Not applicable | Not text-based |
 | 18 | Other unique identifiers | Partial | Dictionary (add as custom terms) |
 
-**Summary:** 14 of 18 identifiers are automatically detected. 2 can be covered by adding organization-specific formats to the dictionary. 2 are not applicable to text processing.
+**Summary:** All 16 applicable text-based identifiers are automatically detected. 2 identifiers (biometric data and photographs) are not applicable to text processing.
 
-### Closing the gaps
+### Strengthening coverage with the dictionary
 
-For the two identifiers marked "Partial" (medical record numbers and certificate/license numbers), add your organization's specific formats to the dictionary for guaranteed redaction:
+While all 16 text-based identifiers are automatically detected, the contextual patterns for medical record numbers and certificate/licence numbers rely on keyword labels being present (e.g. "MRN:", "Licence No:"). If your organization uses unlabelled identifiers with known formats, add them to the dictionary for guaranteed redaction:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/dictionary \
@@ -64,7 +64,7 @@ curl -X POST http://localhost:3000/api/v1/dictionary \
   }'
 ```
 
-The dictionary layer runs first and provides guaranteed redaction — if a term is in the dictionary, it will always be caught.
+The dictionary layer runs first and provides guaranteed redaction — if a term is in the dictionary, it will always be caught regardless of context.
 
 ## HIPAA Security Rule alignment
 

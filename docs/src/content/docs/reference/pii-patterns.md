@@ -21,6 +21,8 @@ These patterns always run regardless of locale setting.
 | VIN (Vehicle Identification Number) | `vin` | 0.95 | Check digit validation (position 9) |
 | MAC Address | `mac-address` | 0.92 | — |
 | IBAN | `iban` | 0.95 | — |
+| Medical Record Number | `medical-record-number` | 0.90 | Contextual (keyword + value) |
+| Certificate/Licence Number | `certificate-licence-number` | 0.88 | Contextual (keyword + value) |
 
 ## Australia
 
@@ -140,6 +142,28 @@ This validation eliminates false positives from random 17-character strings.
 ### MAC Address detection
 
 Matches MAC addresses in both colon-separated (`00:1A:2B:3C:4D:5E`) and hyphen-separated (`00-1A-2B-3C-4D-5E`) formats. Each octet is exactly 2 hex digits.
+
+### Contextual patterns
+
+These patterns use keyword anchoring rather than format matching. They detect when a recognizable label (e.g. "MRN:", "Licence No:") is followed by an alphanumeric identifier.
+
+**Medical Record Number** matches these keyword prefixes:
+
+`MRN`, `Medical Record`, `Patient ID`, `Patient No`, `Chart No`, `Record No`, `Hospital No`, `Health Record`, `UR No`, `URN`, `Unit Record`
+
+Followed by a separator (`:`, `#`, `-`, space) and an alphanumeric value of 3+ characters.
+
+Examples: `MRN: 12345678`, `Patient ID: P-12345`, `Chart No: CH-44556`
+
+**Certificate/Licence Number** matches these keyword prefixes:
+
+`Licence`, `License`, `Certificate`, `Registration`, `Accreditation`, `Permit`
+
+Followed by a qualifier (`No`, `Number`, `#`, `ID`) and an alphanumeric value of 3+ characters.
+
+Examples: `Licence No: DL-987654`, `Certificate #: CERT-789`, `Registration Number: REG-00123`
+
+These contextual patterns complete HIPAA Safe Harbor coverage for identifiers #8 (medical record numbers) and #11 (certificate/licence numbers). For unlabelled identifiers with known formats, add them to the [dictionary](/guides/dictionary/) for guaranteed detection.
 
 ## Confidence scores
 

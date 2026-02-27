@@ -29,7 +29,7 @@ The LLM never sees the original PII. The token mappings never leave your infrast
 
 | Framework | Relevance | Details |
 |-----------|-----------|---------|
-| [HIPAA](/compliance/hipaa/) | PHI de-identification before LLM processing | Automatically detects 14 of 18 Safe Harbor identifiers |
+| [HIPAA](/compliance/hipaa/) | PHI de-identification before LLM processing | All 16 applicable Safe Harbor identifiers covered |
 | [GDPR](/compliance/gdpr/) | Data minimization and international transfer controls | Articles 5, 25, 32, 44-49 |
 | [SOC 2](/compliance/soc2/) | Confidentiality and privacy trust service criteria | CC6.7, P3.1, P6.1, P6.5, C1.1 |
 | [ISO 27001](/compliance/iso27001/) | Information security management controls | A.8.2, A.10.1, A.13.2, A.14.1 |
