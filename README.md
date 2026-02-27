@@ -4,7 +4,6 @@
 
 <p align="center">
   <a href="https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml"><img src="https://github.com/Bridge-Point/anonamoose/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://bridge-point.github.io/anonamoose/coverage/"><img src="https://bridge-point.github.io/anonamoose/coverage/badge.svg" alt="Coverage"></a>
 </p>
 
 > **License:** Anonamoose is built and maintained by [BridgePoint](https://bridgepoint.co.nz) and licensed under [Business Source License 1.1](./LICENSE). Free for personal projects and non-commercial use. Commercial use (including offering as a hosted service) requires a commercial licence from BridgePoint. Contact [ben@bridgepoint.co.nz](mailto:ben@bridgepoint.co.nz).
