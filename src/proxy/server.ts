@@ -312,9 +312,26 @@ export class ProxyServer {
       res.json({ ok: true });
     });
 
+    // Public stats endpoint (used by dashboard — no auth required)
+    api.get('/stats/public', async (req: Request, res: Response) => {
+      try {
+        const activeSessions = await this.rehydrationStore.size();
+        const storeStats = await this.rehydrationStore.getStats();
+        res.json({
+          ...this.stats,
+          activeSessions,
+          storageConnected: storeStats.storageConnected,
+          dictionarySize: ((this.redactionPipeline as any).getDictionary() as DictionaryService).size(),
+        });
+      } catch (err: any) {
+        console.error('API error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
     // Protected routes — require API_TOKEN (or STATS_TOKEN for stats-only endpoints)
     api.use((req: Request, res: Response, next: NextFunction) => {
-      const isStatsRoute = req.path === '/stats' || req.path === '/stats/public' || req.path === '/storage';
+      const isStatsRoute = req.path === '/stats' || req.path === '/storage';
       if (isStatsRoute && (this.isAuthenticated(req) || this.isStatsAuthenticated(req))) {
         next();
         return;
@@ -754,23 +771,6 @@ export class ProxyServer {
         res.json({ success: true, deletedCount: deleted });
       } catch (err: any) {
         console.error('Flush error:', err);
-        res.status(500).json({ error: 'Internal server error' });
-      }
-    });
-
-    // Public stats endpoint (used by dashboard)
-    api.get('/stats/public', async (req: Request, res: Response) => {
-      try {
-        const activeSessions = await this.rehydrationStore.size();
-        const storeStats = await this.rehydrationStore.getStats();
-        res.json({
-          ...this.stats,
-          activeSessions,
-          storageConnected: storeStats.storageConnected,
-          dictionarySize: ((this.redactionPipeline as any).getDictionary() as DictionaryService).size(),
-        });
-      } catch (err: any) {
-        console.error('API error:', err);
         res.status(500).json({ error: 'Internal server error' });
       }
     });
