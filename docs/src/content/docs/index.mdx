@@ -3,13 +3,16 @@ title: Anonamoose
 description: LLM Anonymization Proxy — Guaranteed PII Redaction with Rehydration
 template: splash
 hero:
-  tagline: Guarantee PII redaction where probabilistic detection fails. Dictionary rules, regex patterns, and NER — with full rehydration.
+  tagline: A drop-in proxy that strips PII from LLM requests before they leave your network. Also works as a standalone redaction API.
   actions:
     - text: Get Started
       link: /getting-started/
       icon: right-arrow
       variant: primary
-    - text: View on GitHub
+    - text: What is Anonamoose?
+      link: /what-is-anonamoose/
+      variant: minimal
+    - text: GitHub
       link: https://github.com/Bridge-Point/anonamoose
       icon: external
       variant: minimal
@@ -17,19 +20,23 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Why Anonamoose?
-
-<CardGrid stagger>
-  <Card title="Guaranteed Redaction" icon="approve-check">
-    Dictionary-based rules are **never bypassed** by probabilistic detection. If you add a term, it will always be redacted — 100% recall.
-  </Card>
-  <Card title="Three-Layer Pipeline" icon="list-format">
-    Dictionary → Regex → NER. Each layer catches what the previous might miss, from explicit terms to algorithmic patterns to context-aware detection.
-  </Card>
-  <Card title="Full Rehydration" icon="random">
-    Tokenized placeholders using Unicode Private Use Area characters allow deterministic restoration of original values after LLM processing.
-  </Card>
+<CardGrid>
   <Card title="Drop-in Proxy" icon="rocket">
-    Point your OpenAI or Anthropic SDK at Anonamoose and PII is automatically redacted on the way in and rehydrated on the way out. Full streaming support.
+    Change one line — the base URL — and your OpenAI or Anthropic SDK is protected. Full streaming support. No code changes.
+  </Card>
+  <Card title="Standalone Redaction API" icon="setting">
+    Strip PII from any text via `/api/v1/redact` without proxying to an LLM. Use for data pipelines, log processing, or data export.
+  </Card>
+  <Card title="Guaranteed Redaction" icon="approve-check">
+    Dictionary rules are **never missed**. If you add a term, it will always be caught — 100% recall, regardless of format or context.
+  </Card>
+  <Card title="Four-Layer Pipeline" icon="list-format">
+    Dictionary, Local AI (NER), Regex, and Name Detection. Each layer catches what the previous might miss.
+  </Card>
+  <Card title="Self-Hosted" icon="laptop">
+    Runs entirely within your infrastructure. SQLite storage, local NER model, no telemetry. PII never leaves your network.
+  </Card>
+  <Card title="Compliance Ready" icon="document">
+    Detection patterns for all 16 text-applicable HIPAA Safe Harbor categories. Mappings for GDPR, SOC 2, and ISO 27001.
   </Card>
 </CardGrid>

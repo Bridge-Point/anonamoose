@@ -25,3 +25,27 @@
   --sl-color-gray-6: #f0f0f0;
   --sl-color-black: #f8f9fa;
 }
+
+/* Reduce whitespace on splash/hero page */
+.hero {
+  padding-block: 2rem !important;
+  gap: 1rem !important;
+}
+
+.hero > img,
+.hero > .hero-html {
+  padding-block: 0 !important;
+}
+
+[data-page-type='splash'] .sl-container {
+  padding-block: 1rem;
+}
+
+[data-page-type='splash'] main {
+  padding-block: 0;
+}
+
+/* Tighter card grid */
+.card-grid {
+  gap: 1rem;
+}
