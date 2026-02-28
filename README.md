@@ -145,6 +145,26 @@ npm test                # run all tests
 npm run test:coverage   # run with coverage report
 ```
 
+## n8n Integration
+
+Use Anonamoose in [n8n](https://n8n.io) workflows with the official community node: [`@bridgepoint/n8n-nodes-anonamoose`](https://github.com/Bridge-Point/n8n-nodes-anonamoose).
+
+Install via **Settings > Community Nodes** in your n8n instance, or:
+
+```bash
+cd ~/.n8n
+npm install @bridgepoint/n8n-nodes-anonamoose
+```
+
+The node supports all four operations:
+
+- **Redact** — detect and replace PII with tokens
+- **Rehydrate** — restore original values using a session ID
+- **Dictionary Add** — add terms for guaranteed redaction
+- **Dictionary Delete** — remove terms by name
+
+It also works as an **AI tool** in n8n agent workflows, letting agents redact and rehydrate PII as part of multi-step reasoning chains.
+
 ## Documentation
 
 Full documentation at [docs.anonamoose.net](https://docs.anonamoose.net).
